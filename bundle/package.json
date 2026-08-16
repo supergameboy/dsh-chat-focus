@@ -4,6 +4,8 @@
   "type": "module",
   "license": "MIT",
   "dsh": {
-    "bundle": "./cordis.patch.yml"
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
   }
 }

@@ -13,19 +13,35 @@ dsh web 对话界面插件：将文本回复之前的**连续运行时信息**�
 
 ## 安装
 
-以 bundle 方式安装（宿主 `dsh-base`/`dsh-web-app` 的补丁层机制）：
+宿主提供官方插件管理命令 `dsh plugin --profile <name> <pnpm args...>`（pnpm 转发 + 自动把声明 `dsh.bundle` 的依赖加入 `dsh.profile.bundles` 层列表）。
 
-1. 在 profile 中声明 bundle 依赖（`dsh.profile.bundles` 追加 `dsh-chat-focus-bundle`），或在 profile 的 `cordis.patch.yml` 合并 `bundle/cordis.patch.yml` 内容：
-   ```yaml
-   - id: ui-conversation
-     disabled: true
-   - insert:
-       - id: chat-focus
-         name: 'dsh-chat-focus'
-   ```
-2. 重启 dsh web。
+一键脚本（推荐，含备份与校验）：
 
-补丁层按 id 覆盖/插入：宿主 `ui-conversation` 行被禁用，`chat-focus` 行挂载 fork；其他宿主插件（ui-tool、ui-plan、ui-commands 等）注册进 fork 声明的同名槽位，功能不变。
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\install.ps1          # 默认 web profile
+powershell -ExecutionPolicy Bypass -File scripts\install.ps1 -Profile web
+```
+
+等价手动步骤：
+
+```sh
+pnpm run bundle                                                  # 先构建 lib/client.js
+dsh plugin --profile web add "link:E:\dsh-chat-focus"            # 安装并自动加入 bundle 层
+# 重启 dsh web
+```
+
+bundle 的 patch 层（`bundle/cordis.patch.yml`）由 loader 自动应用：宿主 `ui-conversation` 行被禁用，`chat-focus` 行挂载 fork；其他宿主插件（ui-tool、ui-plan、ui-commands 等）注册进 fork 声明的同名槽位，功能不变。
+
+## 卸载
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\uninstall.ps1                 # 保留设置字段残留（无害）
+powershell -ExecutionPolicy Bypass -File scripts\uninstall.ps1 -CleanSettings  # 同时清理 settings.yaml 的 focus* 字段
+```
+
+等价手动步骤：`dsh plugin --profile web remove dsh-chat-focus` + 重启。
+
+移除 bundle 层后，宿主 `ui-conversation` 行自动恢复（补丁层机制：层不应用即回到宿主行）。残留（均无害）：设置文件 `ui-conversation` 命名空间中的 focus 字段（宿主 schema 放行未知键，`-CleanSettings` 可清理）；localStorage `dsh.chat-focus.fold.*`（浏览器端）。会话记录零污染（插件仅 UI 渲染，不写 session log）。
 
 ## 构建
 
@@ -54,11 +70,14 @@ pnpm run bundle     # tsdown：lib/index.js（node 半区）+ lib/client.js（�
 
 ## 卸载
 
-1. 从 profile 的 bundles 列表移除本 bundle（或撤销手动 patch 的插入行与 `disabled`）；
-2. 重启 dsh web —— 宿主 `ui-conversation` 行自动恢复，对话界面回到宿主原生表现；
-3. 残留（均无害，可忽略）：设置文件 `ui-conversation` 命名空间中的 focus 字段（宿主 schema 放行未知键）；localStorage `dsh.chat-focus.fold.*`。
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\uninstall.ps1                 # 保留设置字段残留（无害）
+powershell -ExecutionPolicy Bypass -File scripts\uninstall.ps1 -CleanSettings  # 同时清理 settings.yaml 的 focus* 字段
+```
 
-会话记录零污染（插件仅 UI 渲染，不写 session log）。
+等价手动步骤：`dsh plugin --profile web remove dsh-chat-focus` + 重启。
+
+移除 bundle 层后，宿主 `ui-conversation` 行自动恢复（补丁层机制：层不应用即回到宿主行）。残留（均无害）：设置文件 `ui-conversation` 命名空间中的 focus 字段（宿主 schema 放行未知键，`-CleanSettings` 可清理）；localStorage `dsh.chat-focus.fold.*`（浏览器端）。会话记录零污染（插件仅 UI 渲染，不写 session log）。
 
 ## 版本配对（上游适配）
 
