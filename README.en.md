@@ -28,7 +28,7 @@ Implementation: a fork of the host `@deepseek-ai/dsh-client-ui-conversation` (rc
 
 | Conversation: folded runtime activity + chat bubbles | Settings: split panel with pinned live preview |
 | --- | --- |
-| ![Conversation](docs/screenshots/conversation.png) | ![Settings](docs/screenshots/settings.png) |
+| ![Conversation](https://raw.githubusercontent.com/supergameboy/dsh-chat-focus/master/docs/screenshots/conversation.png) | ![Settings](https://raw.githubusercontent.com/supergameboy/dsh-chat-focus/master/docs/screenshots/settings.png) |
 
 ## Settings guide
 

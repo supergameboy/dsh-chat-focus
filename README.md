@@ -28,7 +28,7 @@ dsh web 对话界面插件：将文本回复之前的**连续运行时信息**�
 
 | 对话界面：折叠运行时信息 + 聊天气泡 | 设置面板：上下分栏 + 固定实时预览 |
 | --- | --- |
-| ![对话界面](docs/screenshots/conversation.png) | ![设置面板](docs/screenshots/settings.png) |
+| ![对话界面](https://raw.githubusercontent.com/supergameboy/dsh-chat-focus/master/docs/screenshots/conversation.png) | ![设置面板](https://raw.githubusercontent.com/supergameboy/dsh-chat-focus/master/docs/screenshots/settings.png) |
 
 ## 安装
 
