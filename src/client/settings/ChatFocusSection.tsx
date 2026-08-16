@@ -372,6 +372,55 @@ export const ChatFocusSection = memo(function ChatFocusSection({
                 />
               )}
             />
+            <Row
+              title={t('focus.customTextColor')}
+              hint={t('focus.customHint')}
+              control={(
+                <ColorField
+                  value={focus.focusBubbleTextColor}
+                  onChange={next => setField('focusBubbleTextColor', next)}
+                />
+              )}
+            />
+            <Row
+              title={t('focus.customFont')}
+              hint={t('focus.customHint')}
+              control={(
+                <input
+                  type="text"
+                  className={css.textInput}
+                  placeholder="'PingFang SC', sans-serif"
+                  value={focus.focusBubbleFont}
+                  onChange={event => setField('focusBubbleFont', event.target.value)}
+                />
+              )}
+            />
+            <Row
+              title={t('focus.customFontSize')}
+              hint={t('focus.customHint')}
+              control={(
+                <input
+                  type="text"
+                  className={css.textInput}
+                  placeholder="15px"
+                  value={focus.focusBubbleFontSize}
+                  onChange={event => setField('focusBubbleFontSize', event.target.value)}
+                />
+              )}
+            />
+            <Row
+              title={t('focus.customPadding')}
+              hint={t('focus.customHint')}
+              control={(
+                <input
+                  type="text"
+                  className={css.textInput}
+                  placeholder="10px 14px"
+                  value={focus.focusBubblePadding}
+                  onChange={event => setField('focusBubblePadding', event.target.value)}
+                />
+              )}
+            />
             <button
               type="button"
               className={css.resetButton}
@@ -382,6 +431,10 @@ export const ChatFocusSection = memo(function ChatFocusSection({
                 setField('focusBubbleRadius', '')
                 setField('focusBubbleMaxWidth', '')
                 setField('focusBubbleBgImage', '')
+                setField('focusBubbleTextColor', '')
+                setField('focusBubbleFont', '')
+                setField('focusBubbleFontSize', '')
+                setField('focusBubblePadding', '')
               }}
             >
               {t('focus.customReset')}
@@ -393,6 +446,29 @@ export const ChatFocusSection = memo(function ChatFocusSection({
                 <ColorField
                   value={focus.focusUserBubbleBg}
                   onChange={next => setField('focusUserBubbleBg', next)}
+                />
+              )}
+            />
+            <Row
+              title={t('focus.userTextColor')}
+              hint={t('focus.customHint')}
+              control={(
+                <ColorField
+                  value={focus.focusUserBubbleTextColor}
+                  onChange={next => setField('focusUserBubbleTextColor', next)}
+                />
+              )}
+            />
+            <Row
+              title={t('focus.userFont')}
+              hint={t('focus.customHint')}
+              control={(
+                <input
+                  type="text"
+                  className={css.textInput}
+                  placeholder="'PingFang SC', sans-serif"
+                  value={focus.focusUserBubbleFont}
+                  onChange={event => setField('focusUserBubbleFont', event.target.value)}
                 />
               )}
             />
@@ -418,10 +494,27 @@ export const ChatFocusSection = memo(function ChatFocusSection({
                 radius: focus.focusBubbleRadius,
                 maxWidth: focus.focusBubbleMaxWidth,
                 bgImage: focus.focusBubbleBgImage,
+                textColor: focus.focusBubbleTextColor,
+                font: focus.focusBubbleFont,
+                fontSize: focus.focusBubbleFontSize,
+                padding: focus.focusBubblePadding,
               }}
             >
               <div className={css.previewReply}>这是正式回复示例文本。</div>
             </ChatBubble>
+            <div className={css.previewUserWrap}>
+              <span className={css.previewLabel}>{t('focus.previewUser')}</span>
+              <div
+                className={css.previewUserBubble}
+                style={{
+                  ...(focus.focusUserBubbleBg !== '' ? { background: focus.focusUserBubbleBg } : {}),
+                  ...(focus.focusUserBubbleTextColor !== '' ? { color: focus.focusUserBubbleTextColor } : {}),
+                  ...(focus.focusUserBubbleFont !== '' ? { fontFamily: focus.focusUserBubbleFont } : {}),
+                }}
+              >
+                这是用户消息示例。
+              </div>
+            </div>
           </div>
         </div>
       </details>

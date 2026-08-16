@@ -228,17 +228,18 @@ function FocusGroupRow({ group, focus, nodeStore, renderSeat, useSession, loadIm
   }
   if (group.kind === 'user') {
     // The host user row renders its own bubble whose background reads
-    // --dsw-specific-bubble; overriding that variable on this container
-    // customizes the user bubble color (inherited by the inner bubble).
-    const userStyle = focus.focusUserBubbleBg !== ''
-      ? { '--dsw-specific-bubble': focus.focusUserBubbleBg } as CSSProperties
-      : undefined
+    // --dsw-specific-bubble; overriding that variable (plus the inherited
+    // color/font) on this container customizes the user bubble.
+    const userStyle: Record<string, string> = {}
+    if (focus.focusUserBubbleBg !== '') userStyle['--dsw-specific-bubble'] = focus.focusUserBubbleBg
+    if (focus.focusUserBubbleTextColor !== '') userStyle.color = focus.focusUserBubbleTextColor
+    if (focus.focusUserBubbleFont !== '') userStyle.fontFamily = focus.focusUserBubbleFont
     return (
       <div
         className={css.flowItem}
         data-chat-flow-key={group.nodeKey}
         data-chat-flow-kind={group.kind}
-        style={userStyle}
+        style={Object.keys(userStyle).length > 0 ? userStyle as CSSProperties : undefined}
       >
         {renderSeat(group.nodeKey)}
       </div>
@@ -286,6 +287,10 @@ function FocusGroupRow({ group, focus, nodeStore, renderSeat, useSession, loadIm
               radius: focus.focusBubbleRadius,
               maxWidth: focus.focusBubbleMaxWidth,
               bgImage: focus.focusBubbleBgImage,
+              textColor: focus.focusBubbleTextColor,
+              font: focus.focusBubbleFont,
+              fontSize: focus.focusBubbleFontSize,
+              padding: focus.focusBubblePadding,
             }}
           >
             {markdown}

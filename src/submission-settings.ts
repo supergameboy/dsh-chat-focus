@@ -55,6 +55,18 @@ export const FOCUS_BUBBLE_BG_IMAGE_FIELD = 'focusBubbleBgImage'
 export const FOCUS_BUBBLE_PRESET_FIELD = 'focusBubblePreset'
 /** Custom user-bubble background (CSS color; empty = theme default deepseek blue). */
 export const FOCUS_USER_BUBBLE_BG_FIELD = 'focusUserBubbleBg'
+/** Custom assistant-bubble text color (CSS color; empty = theme default). */
+export const FOCUS_BUBBLE_TEXT_COLOR_FIELD = 'focusBubbleTextColor'
+/** Custom assistant-bubble font family (CSS value; empty = theme default). */
+export const FOCUS_BUBBLE_FONT_FIELD = 'focusBubbleFont'
+/** Custom assistant-bubble font size (CSS length; empty = theme default). */
+export const FOCUS_BUBBLE_FONT_SIZE_FIELD = 'focusBubbleFontSize'
+/** Custom assistant-bubble padding (CSS shorthand; empty = theme default). */
+export const FOCUS_BUBBLE_PADDING_FIELD = 'focusBubblePadding'
+/** Custom user-bubble text color (CSS color; empty = theme default). */
+export const FOCUS_USER_BUBBLE_TEXT_COLOR_FIELD = 'focusUserBubbleTextColor'
+/** Custom user-bubble font family (CSS value; empty = theme default). */
+export const FOCUS_USER_BUBBLE_FONT_FIELD = 'focusUserBubbleFont'
 
 /** Defaults shared by the schema, the client scope, and the grouping engine. */
 export const DEFAULT_FOCUS_ENABLED = true
@@ -72,6 +84,12 @@ export const DEFAULT_FOCUS_BUBBLE_MAX_WIDTH = ''
 export const DEFAULT_FOCUS_BUBBLE_BG_IMAGE = ''
 export const DEFAULT_FOCUS_BUBBLE_PRESET = ''
 export const DEFAULT_FOCUS_USER_BUBBLE_BG = ''
+export const DEFAULT_FOCUS_BUBBLE_TEXT_COLOR = ''
+export const DEFAULT_FOCUS_BUBBLE_FONT = ''
+export const DEFAULT_FOCUS_BUBBLE_FONT_SIZE = ''
+export const DEFAULT_FOCUS_BUBBLE_PADDING = ''
+export const DEFAULT_FOCUS_USER_BUBBLE_TEXT_COLOR = ''
+export const DEFAULT_FOCUS_USER_BUBBLE_FONT = ''
 
 /** Static defaults the client uses while the namespace is loading or unavailable. */
 export const DEFAULT_CONVERSATION_SETTINGS: ConversationSettings = {
@@ -91,6 +109,12 @@ export const DEFAULT_CONVERSATION_SETTINGS: ConversationSettings = {
   focusBubbleBgImage: DEFAULT_FOCUS_BUBBLE_BG_IMAGE,
   focusBubblePreset: DEFAULT_FOCUS_BUBBLE_PRESET,
   focusUserBubbleBg: DEFAULT_FOCUS_USER_BUBBLE_BG,
+  focusBubbleTextColor: DEFAULT_FOCUS_BUBBLE_TEXT_COLOR,
+  focusBubbleFont: DEFAULT_FOCUS_BUBBLE_FONT,
+  focusBubbleFontSize: DEFAULT_FOCUS_BUBBLE_FONT_SIZE,
+  focusBubblePadding: DEFAULT_FOCUS_BUBBLE_PADDING,
+  focusUserBubbleTextColor: DEFAULT_FOCUS_USER_BUBBLE_TEXT_COLOR,
+  focusUserBubbleFont: DEFAULT_FOCUS_USER_BUBBLE_FONT,
 }
 
 /** Durable ChatFocus display section. */
@@ -125,6 +149,18 @@ export interface ChatFocusSettings {
   focusBubblePreset: string
   /** Custom user-bubble background color (empty = theme deepseek blue). */
   focusUserBubbleBg: string
+  /** Custom assistant-bubble text color (empty = theme default). */
+  focusBubbleTextColor: string
+  /** Custom assistant-bubble font family (empty = theme default). */
+  focusBubbleFont: string
+  /** Custom assistant-bubble font size (empty = theme default). */
+  focusBubbleFontSize: string
+  /** Custom assistant-bubble padding (empty = theme default). */
+  focusBubblePadding: string
+  /** Custom user-bubble text color (empty = theme default). */
+  focusUserBubbleTextColor: string
+  /** Custom user-bubble font family (empty = theme default). */
+  focusUserBubbleFont: string
 }
 
 /** Durable conversation section shared by the Host schema and the browser scope. */
@@ -151,4 +187,10 @@ export const ConversationSettingsSchema: z<ConversationSettings> = z.object({
   [FOCUS_BUBBLE_BG_IMAGE_FIELD]: z.string().default(DEFAULT_FOCUS_BUBBLE_BG_IMAGE),
   [FOCUS_BUBBLE_PRESET_FIELD]: z.string().default(DEFAULT_FOCUS_BUBBLE_PRESET),
   [FOCUS_USER_BUBBLE_BG_FIELD]: z.string().default(DEFAULT_FOCUS_USER_BUBBLE_BG),
+  [FOCUS_BUBBLE_TEXT_COLOR_FIELD]: z.string().default(DEFAULT_FOCUS_BUBBLE_TEXT_COLOR),
+  [FOCUS_BUBBLE_FONT_FIELD]: z.string().default(DEFAULT_FOCUS_BUBBLE_FONT),
+  [FOCUS_BUBBLE_FONT_SIZE_FIELD]: z.string().default(DEFAULT_FOCUS_BUBBLE_FONT_SIZE),
+  [FOCUS_BUBBLE_PADDING_FIELD]: z.string().default(DEFAULT_FOCUS_BUBBLE_PADDING),
+  [FOCUS_USER_BUBBLE_TEXT_COLOR_FIELD]: z.string().default(DEFAULT_FOCUS_USER_BUBBLE_TEXT_COLOR),
+  [FOCUS_USER_BUBBLE_FONT_FIELD]: z.string().default(DEFAULT_FOCUS_USER_BUBBLE_FONT),
 })

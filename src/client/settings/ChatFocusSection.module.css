@@ -227,3 +227,20 @@
   color: var(--dsw-alias-label-secondary);
   background: var(--dsw-alias-bg-base);
 }
+
+.previewUserWrap {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.previewUserBubble {
+  max-width: 70%;
+  background: var(--dsw-specific-bubble);
+  border-radius: 22px;
+  padding: 10px 16px;
+  font-size: 14px;
+  line-height: 22px;
+  color: var(--dsw-alias-label-primary);
+}

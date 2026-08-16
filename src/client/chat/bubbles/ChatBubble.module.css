@@ -48,13 +48,16 @@
 .content {
   min-width: 0;
   border-radius: var(--cf-bubble-radius, 22px);
-  padding: 10px 14px;
+  padding: var(--cf-bubble-padding, 10px 14px);
   overflow-wrap: anywhere;
   background-color: var(--cf-bubble-bg, var(--dsw-specific-bubble));
   border: 1px solid var(--cf-bubble-border, transparent);
   background-image: var(--cf-bubble-bg-image, none);
   background-size: cover;
   background-position: center;
+  color: var(--cf-bubble-text-color, inherit);
+  font-family: var(--cf-bubble-font, inherit);
+  font-size: var(--cf-bubble-font-size, inherit);
 }
 
 .compact .content {
