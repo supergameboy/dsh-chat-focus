@@ -3,6 +3,10 @@
   "description": "dsh web 对话界面插件：折叠运行时信息 + 聊天气泡 + 可配置设置（fork 自 @deepseek-ai/dsh-client-ui-conversation）",
   "version": "0.1.0",
   "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/supergameboy/dsh-chat-focus.git"
+  },
   "main": "lib/index.js",
   "types": "lib/types/index.d.ts",
   "exports": {
@@ -41,6 +45,7 @@
     "bundle": "tsdown",
     "watch": "tsdown --watch",
     "typecheck": "tsc --noEmit",
+    "test:engine": "node --import tsx/esm tests/engine.check.ts",
     "setup:links": "node scripts/setup-junctions.mjs",
     "install:profile": "node scripts/install.mjs",
     "uninstall:profile": "node scripts/uninstall.mjs"
