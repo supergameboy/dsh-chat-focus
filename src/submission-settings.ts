@@ -100,6 +100,18 @@ export const FOCUS_USER_BUBBLE_GRADIENT_TO_FIELD = 'focusUserBubbleGradientTo'
 export const FOCUS_USER_BUBBLE_GRADIENT_ANGLE_FIELD = 'focusUserBubbleGradientAngle'
 /** User-bubble template id ('' = none/custom). */
 export const FOCUS_USER_BUBBLE_PRESET_FIELD = 'focusUserBubblePreset'
+/** Background-image vertical alignment for cover/stretch fits. */
+export const FOCUS_BUBBLE_BG_POSITION_FIELD = 'focusBubbleBgPosition'
+/** User-bubble background-image vertical alignment. */
+export const FOCUS_USER_BUBBLE_BG_POSITION_FIELD = 'focusUserBubbleBgPosition'
+/** Text-readability overlay on the assistant bubble background (CSS color). */
+export const FOCUS_BUBBLE_OVERLAY_FIELD = 'focusBubbleOverlay'
+/** Text-readability overlay on the user bubble background (CSS color). */
+export const FOCUS_USER_BUBBLE_OVERLAY_FIELD = 'focusUserBubbleOverlay'
+
+/** Background-image vertical alignment modes. */
+export const FOCUS_BG_POSITIONS = ['top', 'center', 'bottom'] as const
+export type FocusBgPosition = typeof FOCUS_BG_POSITIONS[number]
 
 /** Defaults shared by the schema, the client scope, and the grouping engine. */
 export const DEFAULT_FOCUS_ENABLED = true
@@ -137,6 +149,10 @@ export const DEFAULT_FOCUS_USER_BUBBLE_PADDING = ''
 export const DEFAULT_FOCUS_USER_BUBBLE_GRADIENT_FROM = ''
 export const DEFAULT_FOCUS_USER_BUBBLE_GRADIENT_TO = ''
 export const DEFAULT_FOCUS_USER_BUBBLE_GRADIENT_ANGLE = '135'
+export const DEFAULT_FOCUS_BUBBLE_BG_POSITION: FocusBgPosition = 'center'
+export const DEFAULT_FOCUS_USER_BUBBLE_BG_POSITION: FocusBgPosition = 'center'
+export const DEFAULT_FOCUS_BUBBLE_OVERLAY = ''
+export const DEFAULT_FOCUS_USER_BUBBLE_OVERLAY = ''
 export const DEFAULT_FOCUS_USER_BUBBLE_PRESET = ''
 
 /** Static defaults the client uses while the namespace is loading or unavailable. */
@@ -178,6 +194,10 @@ export const DEFAULT_CONVERSATION_SETTINGS: ConversationSettings = {
   focusUserBubbleGradientTo: DEFAULT_FOCUS_USER_BUBBLE_GRADIENT_TO,
   focusUserBubbleGradientAngle: DEFAULT_FOCUS_USER_BUBBLE_GRADIENT_ANGLE,
   focusUserBubblePreset: DEFAULT_FOCUS_USER_BUBBLE_PRESET,
+  focusBubbleBgPosition: DEFAULT_FOCUS_BUBBLE_BG_POSITION,
+  focusUserBubbleBgPosition: DEFAULT_FOCUS_USER_BUBBLE_BG_POSITION,
+  focusBubbleOverlay: DEFAULT_FOCUS_BUBBLE_OVERLAY,
+  focusUserBubbleOverlay: DEFAULT_FOCUS_USER_BUBBLE_OVERLAY,
 }
 
 /** Durable ChatFocus display section. */
@@ -254,6 +274,14 @@ export interface ChatFocusSettings {
   focusUserBubbleGradientAngle: string
   /** User-bubble template id (empty = none/custom). */
   focusUserBubblePreset: string
+  /** Background-image vertical alignment (top/center/bottom). */
+  focusBubbleBgPosition: FocusBgPosition
+  /** User-bubble background-image vertical alignment. */
+  focusUserBubbleBgPosition: FocusBgPosition
+  /** Text-readability overlay on the assistant bubble background (CSS color; empty = none). */
+  focusBubbleOverlay: string
+  /** Text-readability overlay on the user bubble background (CSS color; empty = none). */
+  focusUserBubbleOverlay: string
 }
 
 /** Durable conversation section shared by the Host schema and the browser scope. */
@@ -301,4 +329,8 @@ export const ConversationSettingsSchema: z<ConversationSettings> = z.object({
   [FOCUS_USER_BUBBLE_GRADIENT_TO_FIELD]: z.string().default(DEFAULT_FOCUS_USER_BUBBLE_GRADIENT_TO),
   [FOCUS_USER_BUBBLE_GRADIENT_ANGLE_FIELD]: z.string().default(DEFAULT_FOCUS_USER_BUBBLE_GRADIENT_ANGLE),
   [FOCUS_USER_BUBBLE_PRESET_FIELD]: z.string().default(DEFAULT_FOCUS_USER_BUBBLE_PRESET),
+  [FOCUS_BUBBLE_BG_POSITION_FIELD]: z.union([...FOCUS_BG_POSITIONS]).default(DEFAULT_FOCUS_BUBBLE_BG_POSITION),
+  [FOCUS_USER_BUBBLE_BG_POSITION_FIELD]: z.union([...FOCUS_BG_POSITIONS]).default(DEFAULT_FOCUS_USER_BUBBLE_BG_POSITION),
+  [FOCUS_BUBBLE_OVERLAY_FIELD]: z.string().default(DEFAULT_FOCUS_BUBBLE_OVERLAY),
+  [FOCUS_USER_BUBBLE_OVERLAY_FIELD]: z.string().default(DEFAULT_FOCUS_USER_BUBBLE_OVERLAY),
 })

@@ -33,7 +33,10 @@
   font-family: var(--cf-user-bubble-font, inherit);
   background-image: var(--cf-user-bubble-bg-image, none);
   background-size: var(--cf-user-bubble-bg-size, cover);
-  background-position: center;
+  background-position: var(--cf-user-bubble-bg-position, 50% 50%);
+  /* Text-readability overlay: an inset shadow draws above the background and
+     below the content, darkening/lightening the image behind the text. */
+  box-shadow: inset 0 0 0 9999px var(--cf-user-bubble-overlay, transparent);
 }
 
 .contextRow {

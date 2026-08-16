@@ -33,7 +33,7 @@ import { AssistantMarkdown } from './AssistantMarkdown.tsx'
 import { ReasoningRow } from './ReasoningRow.tsx'
 import { buildGroups, type GroupRow } from './grouping/engine.ts'
 import { RuntimeFoldBox } from './bubbles/RuntimeFoldBox.tsx'
-import { ChatBubble, bgImageCssValue } from './bubbles/ChatBubble.tsx'
+import { ChatBubble, bgImageCssValue, bgPositionCss } from './bubbles/ChatBubble.tsx'
 import { formatRunDuration } from './message-chrome.ts'
 import css from './ChatView.module.css'
 
@@ -56,6 +56,8 @@ interface BubbleSideFields {
   maxWidth: string
   bgImage: string
   bgSize: FocusBubbleBgSize
+  bgPosition: 'top' | 'center' | 'bottom'
+  overlay: string
   gradientFrom: string
   gradientTo: string
   gradientAngle: string
@@ -78,6 +80,8 @@ function bubbleCustom(side: BubbleSideFields): ChatBubbleCustomStyle {
       ? `linear-gradient(${side.gradientAngle}deg, ${side.gradientFrom}, ${side.gradientTo !== '' ? side.gradientTo : side.gradientFrom})`
       : side.bgImage,
     bgSize: side.bgSize,
+    bgPosition: side.bgPosition,
+    overlay: side.overlay,
     textColor: side.textColor,
     font: side.font,
     fontSize: side.fontSize,
@@ -98,6 +102,8 @@ function userBubbleVars(side: BubbleSideFields): Record<string, string> {
   set('--cf-user-bubble-max-width', custom.maxWidth)
   set('--cf-user-bubble-bg-image', custom.bgImage === undefined ? undefined : bgImageCssValue(custom.bgImage))
   set('--cf-user-bubble-bg-size', custom.bgSize === 'stretch' ? '100% 100%' : custom.bgSize)
+  set('--cf-user-bubble-bg-position', bgPositionCss(custom.bgPosition))
+  set('--cf-user-bubble-overlay', custom.overlay)
   set('--cf-user-bubble-text-color', custom.textColor)
   set('--cf-user-bubble-font', custom.font)
   set('--cf-user-bubble-font-size', custom.fontSize)
@@ -319,6 +325,8 @@ function FocusGroupRow({ group, focus, nodeStore, renderSeat, useSession, loadIm
       maxWidth: focus.focusUserBubbleMaxWidth,
       bgImage: focus.focusUserBubbleBgImage,
       bgSize: focus.focusUserBubbleBgSize,
+      bgPosition: focus.focusUserBubbleBgPosition,
+      overlay: focus.focusUserBubbleOverlay,
       gradientFrom: focus.focusUserBubbleGradientFrom,
       gradientTo: focus.focusUserBubbleGradientTo,
       gradientAngle: focus.focusUserBubbleGradientAngle,
@@ -381,6 +389,8 @@ function FocusGroupRow({ group, focus, nodeStore, renderSeat, useSession, loadIm
               maxWidth: focus.focusBubbleMaxWidth,
               bgImage: focus.focusBubbleBgImage,
               bgSize: focus.focusBubbleBgSize,
+              bgPosition: focus.focusBubbleBgPosition,
+              overlay: focus.focusBubbleOverlay,
               gradientFrom: focus.focusBubbleGradientFrom,
               gradientTo: focus.focusBubbleGradientTo,
               gradientAngle: focus.focusBubbleGradientAngle,

@@ -39,6 +39,10 @@ export interface ChatBubbleCustomStyle {
   readonly bgImage?: string
   /** Background-image fit: cover | contain | stretch (100% 100%). */
   readonly bgSize?: 'cover' | 'contain' | 'stretch'
+  /** Background-image vertical alignment for cover/stretch fits. */
+  readonly bgPosition?: 'top' | 'center' | 'bottom'
+  /** Text-readability overlay color over the background (CSS color). */
+  readonly overlay?: string
   /** CSS color for the bubble text. */
   readonly textColor?: string
   /** CSS font family for the bubble text. */
@@ -59,6 +63,13 @@ export function bgImageCssValue(value: string): string {
     return `url("${value.replace(/"/g, '\\"')}")`
   }
   return value
+}
+
+/** Map a vertical alignment mode to a CSS `background-position` value. */
+export function bgPositionCss(position: 'top' | 'center' | 'bottom' | undefined): string | undefined {
+  if (position === 'top') return '50% 0%'
+  if (position === 'bottom') return '50% 100%'
+  return undefined // center: the CSS fallback 50% 50% applies
 }
 
 /** Full props of one bubble row. */
@@ -93,6 +104,9 @@ export const ChatBubble = memo(function ChatBubble({
     if (custom.bgSize !== undefined) {
       customVars['--cf-bubble-bg-size'] = custom.bgSize === 'stretch' ? '100% 100%' : custom.bgSize
     }
+    const bgPosition = bgPositionCss(custom.bgPosition)
+    if (bgPosition !== undefined) customVars['--cf-bubble-bg-position'] = bgPosition
+    if (custom.overlay !== undefined && custom.overlay !== '') customVars['--cf-bubble-overlay'] = custom.overlay
     if (custom.textColor !== undefined && custom.textColor !== '') {
       customVars['--cf-bubble-text-color'] = custom.textColor
       // The markdown body colors itself with the host label token; overriding

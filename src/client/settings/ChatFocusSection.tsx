@@ -11,12 +11,12 @@ import { Modal } from '@deepseek-ai/dsh-client-ui-primitives'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type { ConversationSettings } from '../../submission-settings.ts'
 import {
-  FOCUS_BUBBLE_BG_SIZES, FOCUS_BUBBLE_STYLES, FOCUS_STRATEGIES,
+  FOCUS_BG_POSITIONS, FOCUS_BUBBLE_BG_SIZES, FOCUS_BUBBLE_STYLES, FOCUS_STRATEGIES,
   type FocusBubbleBgSize, type FocusBubbleStyle, type FocusFoldStrategy,
 } from '../../submission-settings.ts'
 import type { ChatBubbleCustomStyle } from '../chat/bubbles/ChatBubble.tsx'
 import { RuntimeFoldBox, type RuntimeFoldBoxProps } from '../chat/bubbles/RuntimeFoldBox.tsx'
-import { ChatBubble, bgImageCssValue } from '../chat/bubbles/ChatBubble.tsx'
+import { ChatBubble, bgImageCssValue, bgPositionCss } from '../chat/bubbles/ChatBubble.tsx'
 import { ImageCropper, compressImageDataUrl } from './ImageCropper.tsx'
 import type { ConversationKey } from '../locales.ts'
 import css from './ChatFocusSection.module.css'
@@ -57,7 +57,8 @@ const BUBBLE_PRESETS: readonly BubblePreset[] = [
 
 /** Preview custom style for one side (gradient overrides the background image). */
 function previewCustom(focus: ConversationSettings, side: 'assistant' | 'user'): ChatBubbleCustomStyle {
-  const f = (suffix: string): string => focus[`${side === 'assistant' ? 'focusBubble' : 'focusUserBubble'}${suffix}` as keyof ConversationSettings] as string
+  const prefix = side === 'assistant' ? 'focusBubble' : 'focusUserBubble'
+  const f = (suffix: string): string => focus[`${prefix}${suffix}` as keyof ConversationSettings] as string
   const gradient = f('GradientFrom') !== ''
   return {
     bg: gradient ? 'transparent' : f('Bg'),
@@ -67,7 +68,9 @@ function previewCustom(focus: ConversationSettings, side: 'assistant' | 'user'):
     bgImage: gradient
       ? `linear-gradient(${f('GradientAngle')}deg, ${f('GradientFrom')}, ${f('GradientTo') !== '' ? f('GradientTo') : f('GradientFrom')})`
       : f('BgImage'),
-    bgSize: focus[`${side === 'assistant' ? 'focusBubble' : 'focusUserBubble'}BgSize` as keyof ConversationSettings] as FocusBubbleBgSize,
+    bgSize: focus[`${prefix}BgSize` as keyof ConversationSettings] as FocusBubbleBgSize,
+    bgPosition: focus[`${prefix}BgPosition` as keyof ConversationSettings] as 'top' | 'center' | 'bottom',
+    overlay: f('Overlay'),
     textColor: f('TextColor'),
     font: f('Font'),
     fontSize: f('FontSize'),
@@ -88,6 +91,10 @@ function previewUserStyle(focus: ConversationSettings): CSSProperties {
   set('maxWidth', custom.maxWidth)
   set('backgroundImage', custom.bgImage === undefined ? undefined : bgImageCssValue(custom.bgImage))
   set('backgroundSize', custom.bgSize === 'stretch' ? '100% 100%' : custom.bgSize)
+  set('backgroundPosition', bgPositionCss(custom.bgPosition) ?? '50% 50%')
+  set('boxShadow', custom.overlay === undefined || custom.overlay === ''
+    ? undefined
+    : `inset 0 0 0 9999px ${custom.overlay}`)
   set('color', custom.textColor)
   set('fontFamily', custom.font)
   set('fontSize', custom.fontSize)
@@ -200,6 +207,21 @@ const FONT_PRESETS: readonly { id: string; value: string }[] = [
 const FONT_SIZE_PRESETS = ['', '12px', '14px', '16px', '18px', '20px', '24px']
 /** Padding presets. */
 const PADDING_PRESETS = ['', '6px 10px', '10px 14px', '14px 18px']
+
+/** Text-readability overlay presets over the bubble background image. */
+const OVERLAY_PRESETS: readonly { id: string; value: string }[] = [
+  { id: '', value: '' },
+  { id: 'black20', value: 'rgba(0, 0, 0, 0.2)' },
+  { id: 'black40', value: 'rgba(0, 0, 0, 0.4)' },
+  { id: 'black60', value: 'rgba(0, 0, 0, 0.6)' },
+  { id: 'white20', value: 'rgba(255, 255, 255, 0.2)' },
+  { id: 'white40', value: 'rgba(255, 255, 255, 0.4)' },
+]
+
+/** Whether a stored overlay value matches one of the built-in presets. */
+function overlayMatched(value: string): boolean {
+  return OVERLAY_PRESETS.some(preset => preset.value === value)
+}
 
 /** Preset dropdown that falls back to a custom option for free-form values. */
 function PresetSelect({ presets, value, emptyKey, customKey, onChange, t }: {
@@ -506,6 +528,46 @@ function BubbleSideEditor({ side, focus, setField, t }: {
         )}
       />
       <Row
+        title={t('focus.bgPosition')}
+        hint={t('focus.bgPositionHint')}
+        control={(
+          <select
+            className={css.select}
+            value={value('BgPosition')}
+            onChange={event => set('BgPosition', event.target.value)}
+          >
+            {FOCUS_BG_POSITIONS.map(position => (
+              <option key={position} value={position}>{t(`focus.bgPosition.${position}`)}</option>
+            ))}
+          </select>
+        )}
+      />
+      <Row
+        title={t('focus.overlay')}
+        hint={t('focus.overlayHint')}
+        control={(
+          <select
+            className={css.select}
+            value={overlayMatched(value('Overlay')) ? value('Overlay') : '__custom__'}
+            onChange={event => {
+              const id = event.target.value
+              if (id === '__custom__') return
+              const preset = OVERLAY_PRESETS.find(candidate => candidate.id === id)
+              if (preset !== undefined) set('Overlay', preset.value)
+            }}
+          >
+            {OVERLAY_PRESETS.map(preset => (
+              <option key={preset.id || 'default'} value={preset.id}>
+                {t(preset.id === '' ? 'focus.overlay.none' : `focus.overlay.${preset.id}` as ConversationKey)}
+              </option>
+            ))}
+            {!overlayMatched(value('Overlay')) && value('Overlay') !== '' && (
+              <option value="__custom__">{t('focus.customValue')}</option>
+            )}
+          </select>
+        )}
+      />
+      <Row
         title={t('focus.customTextColor')}
         hint={t('focus.customHint')}
         control={<ColorField value={value('TextColor')} onChange={next => set('TextColor', next)} />}
@@ -554,6 +616,8 @@ function BubbleSideEditor({ side, focus, setField, t }: {
           set('MaxWidth', '')
           set('BgImage', '')
           set('BgSize', 'cover')
+          set('BgPosition', 'center')
+          set('Overlay', '')
           set('GradientFrom', '')
           set('GradientTo', '')
           set('GradientAngle', '135')
