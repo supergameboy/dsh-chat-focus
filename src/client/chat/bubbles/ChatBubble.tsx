@@ -41,7 +41,8 @@ export interface ChatBubbleCustomStyle {
   readonly bgSize?: 'cover' | 'contain' | 'stretch'
   /** Background-image vertical alignment for cover/stretch fits. */
   readonly bgPosition?: 'top' | 'center' | 'bottom'
-  /** Text-readability overlay color over the background (CSS color). */
+  /** Text-readability overlay: a signed percentage string (-100 = solid
+   *  black, 0 = none, +100 = solid white); legacy CSS colors pass through. */
   readonly overlay?: string
   /** CSS color for the bubble text. */
   readonly textColor?: string
@@ -70,6 +71,18 @@ export function bgPositionCss(position: 'top' | 'center' | 'bottom' | undefined)
   if (position === 'top') return '50% 0%'
   if (position === 'bottom') return '50% 100%'
   return undefined // center: the CSS fallback 50% 50% applies
+}
+
+/** Map a signed overlay percentage (-100..+100) to a CSS overlay color:
+ *  negative dims with black, positive lifts with white, 0 means none.
+ *  Non-numeric strings (legacy CSS colors) pass through unchanged. */
+export function overlayCss(value: string): string | undefined {
+  if (value === '') return undefined
+  const strength = Number(value)
+  if (Number.isNaN(strength)) return value
+  if (strength === 0) return undefined
+  const alpha = Math.min(1, Math.abs(strength) / 100).toFixed(2)
+  return strength < 0 ? `rgba(0, 0, 0, ${alpha})` : `rgba(255, 255, 255, ${alpha})`
 }
 
 /** Full props of one bubble row. */
@@ -106,7 +119,10 @@ export const ChatBubble = memo(function ChatBubble({
     }
     const bgPosition = bgPositionCss(custom.bgPosition)
     if (bgPosition !== undefined) customVars['--cf-bubble-bg-position'] = bgPosition
-    if (custom.overlay !== undefined && custom.overlay !== '') customVars['--cf-bubble-overlay'] = custom.overlay
+    if (custom.overlay !== undefined && custom.overlay !== '') {
+      const overlay = overlayCss(custom.overlay)
+      if (overlay !== undefined) customVars['--cf-bubble-overlay'] = overlay
+    }
     if (custom.textColor !== undefined && custom.textColor !== '') {
       customVars['--cf-bubble-text-color'] = custom.textColor
       // The markdown body colors itself with the host label token; overriding

@@ -16,7 +16,7 @@ import {
 } from '../../submission-settings.ts'
 import type { ChatBubbleCustomStyle } from '../chat/bubbles/ChatBubble.tsx'
 import { RuntimeFoldBox, type RuntimeFoldBoxProps } from '../chat/bubbles/RuntimeFoldBox.tsx'
-import { ChatBubble, bgImageCssValue, bgPositionCss } from '../chat/bubbles/ChatBubble.tsx'
+import { ChatBubble, bgImageCssValue, bgPositionCss, overlayCss } from '../chat/bubbles/ChatBubble.tsx'
 import { ImageCropper, compressImageDataUrl } from './ImageCropper.tsx'
 import type { ConversationKey } from '../locales.ts'
 import css from './ChatFocusSection.module.css'
@@ -92,9 +92,11 @@ function previewUserStyle(focus: ConversationSettings): CSSProperties {
   set('backgroundImage', custom.bgImage === undefined ? undefined : bgImageCssValue(custom.bgImage))
   set('backgroundSize', custom.bgSize === 'stretch' ? '100% 100%' : custom.bgSize)
   set('backgroundPosition', bgPositionCss(custom.bgPosition) ?? '50% 50%')
-  set('boxShadow', custom.overlay === undefined || custom.overlay === ''
-    ? undefined
-    : `inset 0 0 0 9999px ${custom.overlay}`)
+  set('boxShadow', custom.overlay === undefined ? undefined
+    : (() => {
+      const css = overlayCss(custom.overlay)
+      return css === undefined ? undefined : `inset 0 0 0 9999px ${css}`
+    })())
   set('color', custom.textColor)
   set('fontFamily', custom.font)
   set('fontSize', custom.fontSize)
@@ -208,19 +210,23 @@ const FONT_SIZE_PRESETS = ['', '12px', '14px', '16px', '18px', '20px', '24px']
 /** Padding presets. */
 const PADDING_PRESETS = ['', '6px 10px', '10px 14px', '14px 18px']
 
-/** Text-readability overlay presets over the bubble background image. */
-const OVERLAY_PRESETS: readonly { id: string; value: string }[] = [
-  { id: '', value: '' },
-  { id: 'black20', value: 'rgba(0, 0, 0, 0.2)' },
-  { id: 'black40', value: 'rgba(0, 0, 0, 0.4)' },
-  { id: 'black60', value: 'rgba(0, 0, 0, 0.6)' },
-  { id: 'white20', value: 'rgba(255, 255, 255, 0.2)' },
-  { id: 'white40', value: 'rgba(255, 255, 255, 0.4)' },
-]
+/** Text-readability overlay slider range: -100 (solid black) … +100 (solid white). */
+const OVERLAY_MIN = -100
+const OVERLAY_MAX = 100
 
-/** Whether a stored overlay value matches one of the built-in presets. */
-function overlayMatched(value: string): boolean {
-  return OVERLAY_PRESETS.some(preset => preset.value === value)
+/** Slider position from a stored overlay value (legacy CSS colors map to 0). */
+function overlayStrength(value: string): number {
+  const strength = Number(value)
+  return Number.isNaN(strength) ? 0 : Math.max(OVERLAY_MIN, Math.min(OVERLAY_MAX, strength))
+}
+
+/** Readable label for the current overlay strength. */
+function overlayLabel(value: string, t: (key: ConversationKey, params?: Record<string, string>) => string): string {
+  const strength = overlayStrength(value)
+  if (strength === 0) return t('focus.overlay.none')
+  return strength < 0
+    ? t('focus.overlay.black', { value: String(-strength) })
+    : t('focus.overlay.white', { value: String(strength) })
 }
 
 /** Preset dropdown that falls back to a custom option for free-form values. */
@@ -546,25 +552,18 @@ function BubbleSideEditor({ side, focus, setField, t }: {
         title={t('focus.overlay')}
         hint={t('focus.overlayHint')}
         control={(
-          <select
-            className={css.select}
-            value={overlayMatched(value('Overlay')) ? value('Overlay') : '__custom__'}
-            onChange={event => {
-              const id = event.target.value
-              if (id === '__custom__') return
-              const preset = OVERLAY_PRESETS.find(candidate => candidate.id === id)
-              if (preset !== undefined) set('Overlay', preset.value)
-            }}
-          >
-            {OVERLAY_PRESETS.map(preset => (
-              <option key={preset.id || 'default'} value={preset.id}>
-                {t(preset.id === '' ? 'focus.overlay.none' : `focus.overlay.${preset.id}` as ConversationKey)}
-              </option>
-            ))}
-            {!overlayMatched(value('Overlay')) && value('Overlay') !== '' && (
-              <option value="__custom__">{t('focus.customValue')}</option>
-            )}
-          </select>
+          <div className={css.overlayControl}>
+            <input
+              type="range"
+              className={css.overlaySlider}
+              min={-100}
+              max={100}
+              step={5}
+              value={overlayStrength(value('Overlay'))}
+              onChange={event => set('Overlay', String(Number(event.target.value)))}
+            />
+            <span className={css.overlayValue}>{overlayLabel(value('Overlay'), t)}</span>
+          </div>
         )}
       />
       <Row

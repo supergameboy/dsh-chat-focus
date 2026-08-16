@@ -148,6 +148,28 @@
   background: var(--dsw-alias-bg-base);
 }
 
+.overlayControl {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 200px;
+}
+
+.overlaySlider {
+  flex: 1;
+  min-width: 0;
+  accent-color: var(--dsw-static-deepseek-500);
+}
+
+.overlayValue {
+  flex: none;
+  width: 76px;
+  text-align: right;
+  font: var(--dsw-font-s-strong-14);
+  color: var(--dsw-alias-label-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
 .select {
   min-width: 160px;
   border: 1px solid var(--dsw-alias-border-l2);

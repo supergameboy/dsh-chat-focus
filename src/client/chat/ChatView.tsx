@@ -33,7 +33,7 @@ import { AssistantMarkdown } from './AssistantMarkdown.tsx'
 import { ReasoningRow } from './ReasoningRow.tsx'
 import { buildGroups, type GroupRow } from './grouping/engine.ts'
 import { RuntimeFoldBox } from './bubbles/RuntimeFoldBox.tsx'
-import { ChatBubble, bgImageCssValue, bgPositionCss } from './bubbles/ChatBubble.tsx'
+import { ChatBubble, bgImageCssValue, bgPositionCss, overlayCss } from './bubbles/ChatBubble.tsx'
 import { formatRunDuration } from './message-chrome.ts'
 import css from './ChatView.module.css'
 
@@ -103,7 +103,7 @@ function userBubbleVars(side: BubbleSideFields): Record<string, string> {
   set('--cf-user-bubble-bg-image', custom.bgImage === undefined ? undefined : bgImageCssValue(custom.bgImage))
   set('--cf-user-bubble-bg-size', custom.bgSize === 'stretch' ? '100% 100%' : custom.bgSize)
   set('--cf-user-bubble-bg-position', bgPositionCss(custom.bgPosition))
-  set('--cf-user-bubble-overlay', custom.overlay)
+  set('--cf-user-bubble-overlay', custom.overlay === undefined ? undefined : overlayCss(custom.overlay))
   set('--cf-user-bubble-text-color', custom.textColor)
   set('--cf-user-bubble-font', custom.font)
   set('--cf-user-bubble-font-size', custom.fontSize)
