@@ -32,7 +32,7 @@ import { StatsLine } from './chat/StatsLine.tsx'
 import { ApprovalPanel } from './skeleton/ApprovalPanel.tsx'
 import { todoDockEntry } from './skeleton/TodoPanel.tsx'
 import { queueDockEntry } from './queue/QueueDock.tsx'
-import { ConversationRoot } from './skeleton/ConversationRoot.tsx'
+import { ConversationRootBoundary } from './skeleton/ConversationRoot.tsx'
 import { ConversationSession, ConversationSessionHeader } from './skeleton/ConversationSession.tsx'
 import { DetailsPanel } from './skeleton/DetailsPanel.tsx'
 import { en, NS, zh, type ConversationKey } from './locales.ts'
@@ -243,7 +243,10 @@ export function apply(ctx: Context): void {
         sessions.open(nextId)
       },
     }),
-  }, ConversationRoot)
+    // Wrap the resident shell in the top-level boundary so any render error
+    // (shell hooks, header, session body, composer chain) shows a card
+    // instead of blanking the whole conversation column.
+  }, ConversationRootBoundary)
 
   // The strict session body fills the resident scrollport without owning it;
   // the Hero/composer path therefore stays fixed while the first blank

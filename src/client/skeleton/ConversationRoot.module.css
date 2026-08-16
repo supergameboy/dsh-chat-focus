@@ -363,3 +363,12 @@
 .root[data-phase='settling'] .composerSeat {
   visibility: hidden;
 }
+
+/* Top-level render-error card: keeps the conversation column from blanking
+   when a child slot or the shell itself fails to render. */
+.rootError {
+  padding: 16px;
+  color: var(--dsw-alias-state-error-primary);
+  font-size: 12px;
+  line-height: 18px;
+}

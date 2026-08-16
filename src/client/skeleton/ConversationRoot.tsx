@@ -2,7 +2,8 @@
 // chain, AND the composer bar (session-maybe slot) stay mounted across
 // no-session/session transitions — the bar renders inert via owner props.
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { Component, useCallback, useEffect, useRef, useState } from 'react'
+import type { ReactNode } from 'react'
 import clsx from 'clsx'
 import type { WorkspaceId } from '@deepseek-ai/dsh-client-runtime/client'
 import type { ConversationSlotProps, InputZone } from '../contract/slots.ts'
@@ -11,6 +12,40 @@ import css from './ConversationRoot.module.css'
 
 /** Full props composed from the slot contract. */
 export type ConversationRootProps = ConversationSlotProps
+
+/** Registered entry: the resident shell wrapped in the top-level boundary
+ *  (kept here so the JSX lives in a .tsx module). */
+export function ConversationRootBoundary(props: ConversationRootProps) {
+  return (
+    <ViewErrorBoundary t={props.t}>
+      <ConversationRoot {...props} />
+    </ViewErrorBoundary>
+  )
+}
+
+/** Top-level view boundary: any render error inside the resident shell
+ *  (header, session body, composer chain, child slots) shows a recoverable
+ *  card instead of blanking the whole conversation column — including the
+ *  composer. */
+export class ViewErrorBoundary extends Component<{
+  t: ConversationSlotProps['t']
+  children: ReactNode
+}, { error: Error | null }> {
+  override state: { error: Error | null } = { error: null }
+
+  static getDerivedStateFromError(error: Error): { error: Error | null } {
+    return { error }
+  }
+
+  override render(): ReactNode {
+    if (this.state.error === null) return this.props.children
+    return (
+      <div className={css.rootError} role="alert">
+        {this.props.t('chat.renderError', { message: this.state.error.message })}
+      </div>
+    )
+  }
+}
 
 export function ConversationRoot({
   sessionId, useSession, useSessions, useWorkspaces, useInput, useComposerBlock,
