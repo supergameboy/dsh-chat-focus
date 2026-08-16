@@ -55,8 +55,14 @@ const BUBBLE_PRESETS: readonly BubblePreset[] = [
   { id: 'texture', values: { bg: 'transparent', bgImage: TEXTURE_DATA_URI, border: '#e5e7eb', radius: '12px' } },
 ]
 
-/** Preview custom style for one side (gradient overrides the background image). */
-function previewCustom(focus: ConversationSettings, side: 'assistant' | 'user'): ChatBubbleCustomStyle {
+/** Preview custom style for one side (gradient overrides the background image).
+ *  A live slider draft overrides the stored overlay so the preview follows
+ *  the thumb while dragging, before the commit writes the setting. */
+function previewCustom(
+  focus: ConversationSettings,
+  side: 'assistant' | 'user',
+  overlayDraft: number | null,
+): ChatBubbleCustomStyle {
   const prefix = side === 'assistant' ? 'focusBubble' : 'focusUserBubble'
   const f = (suffix: string): string => focus[`${prefix}${suffix}` as keyof ConversationSettings] as string
   const gradient = f('GradientFrom') !== ''
@@ -70,7 +76,7 @@ function previewCustom(focus: ConversationSettings, side: 'assistant' | 'user'):
       : f('BgImage'),
     bgSize: focus[`${prefix}BgSize` as keyof ConversationSettings] as FocusBubbleBgSize,
     bgPosition: focus[`${prefix}BgPosition` as keyof ConversationSettings] as 'top' | 'center' | 'bottom',
-    overlay: f('Overlay'),
+    overlay: overlayDraft === null ? f('Overlay') : String(overlayDraft),
     textColor: f('TextColor'),
     font: f('Font'),
     fontSize: f('FontSize'),
@@ -79,8 +85,8 @@ function previewCustom(focus: ConversationSettings, side: 'assistant' | 'user'):
 }
 
 /** Preview style for the simulated user bubble (mirrors the host chrome). */
-function previewUserStyle(focus: ConversationSettings): CSSProperties {
-  const custom = previewCustom(focus, 'user')
+function previewUserStyle(focus: ConversationSettings, overlayDraft: number | null): CSSProperties {
+  const custom = previewCustom(focus, 'user', overlayDraft)
   const style: Record<string, string> = {}
   const set = (name: string, value: string | undefined): void => {
     if (value !== undefined && value !== '') style[name] = value
@@ -398,16 +404,25 @@ function BgImageField({ value, onChange, t }: {
 }
 
 /** Full per-side bubble editor (assistant or user) with the shared knobs. */
-function BubbleSideEditor({ side, focus, setField, t }: {
+function BubbleSideEditor({ side, focus, setField, overlayDraft, onOverlayDraft, t }: {
   side: 'assistant' | 'user'
   focus: ConversationSettings
   setField: (field: keyof ConversationSettings, value: unknown) => void
+  /** Live slider value while dragging (preview only, not yet persisted). */
+  overlayDraft: number | null
+  /** Update the live slider draft (no settings write). */
+  onOverlayDraft: (next: number | null) => void
   t: (key: ConversationKey) => string
 }) {
   const prefix = side === 'assistant' ? 'focusBubble' : 'focusUserBubble'
   const field = (suffix: string): keyof ConversationSettings => `${prefix}${suffix}` as keyof ConversationSettings
   const value = (suffix: string): string => focus[field(suffix)] as string
   const set = (suffix: string, next: unknown): void => setField(field(suffix), next)
+  const commitOverlay = (): void => {
+    if (overlayDraft === null) return
+    set('Overlay', String(overlayDraft))
+    onOverlayDraft(null)
+  }
 
   return (
     <details className={css.sideBlock} open>
@@ -559,10 +574,17 @@ function BubbleSideEditor({ side, focus, setField, t }: {
               min={-100}
               max={100}
               step={5}
-              value={overlayStrength(value('Overlay'))}
-              onChange={event => set('Overlay', String(Number(event.target.value)))}
+              value={overlayDraft ?? overlayStrength(value('Overlay'))}
+              // Drag only updates the local draft (preview follows instantly);
+              // the settings write happens once on release/keyup/blur.
+              onChange={event => onOverlayDraft(Number(event.target.value))}
+              onPointerUp={commitOverlay}
+              onKeyUp={commitOverlay}
+              onBlur={commitOverlay}
             />
-            <span className={css.overlayValue}>{overlayLabel(value('Overlay'), t)}</span>
+            <span className={css.overlayValue}>
+              {overlayLabel(overlayDraft === null ? value('Overlay') : String(overlayDraft), t)}
+            </span>
           </div>
         )}
       />
@@ -640,6 +662,18 @@ export const ChatFocusSection = memo(function ChatFocusSection({
   const setField = (field: keyof ConversationSettings, value: unknown): void => {
     setFocusField(field, value)
   }
+  // Live overlay slider drafts per side: dragging updates these (and thus the
+  // preview) locally; releasing commits the value through the settings scope.
+  const [overlayDrafts, setOverlayDrafts] = useState<{ assistant: number | null; user: number | null }>({
+    assistant: null,
+    user: null,
+  })
+  const overlayHandlers = (side: 'assistant' | 'user') => ({
+    overlayDraft: overlayDrafts[side],
+    onOverlayDraft: (next: number | null): void => {
+      setOverlayDrafts(drafts => ({ ...drafts, [side]: next }))
+    },
+  })
   const rootRef = useRef<HTMLDivElement | null>(null)
   // The settings slot renders inside a host scroll pane whose height chain
   // has no 100% contract, so measure the nearest scroll ancestor and pin the
@@ -795,8 +829,8 @@ export const ChatFocusSection = memo(function ChatFocusSection({
               />
             )}
           />
-          <BubbleSideEditor side="assistant" focus={focus} setField={setField} t={t} />
-          <BubbleSideEditor side="user" focus={focus} setField={setField} t={t} />
+          <BubbleSideEditor side="assistant" focus={focus} setField={setField} t={t} {...overlayHandlers('assistant')} />
+          <BubbleSideEditor side="user" focus={focus} setField={setField} t={t} {...overlayHandlers('user')} />
         </div>
       </details>
       </div>
@@ -818,13 +852,13 @@ export const ChatFocusSection = memo(function ChatFocusSection({
           role="assistant"
           compact={focus.focusBubbleStyle === 'compact'}
           time={Date.now()}
-          custom={previewCustom(focus, 'assistant')}
+          custom={previewCustom(focus, 'assistant', overlayDrafts.assistant)}
         >
           <div className={css.previewReply}>这是正式回复示例文本。</div>
         </ChatBubble>
         <div className={css.previewUserWrap}>
           <span className={css.previewLabel}>{t('focus.previewUser')}</span>
-          <div className={css.previewUserBubble} style={previewUserStyle(focus)}>
+          <div className={css.previewUserBubble} style={previewUserStyle(focus, overlayDrafts.user)}>
             这是用户消息示例。
           </div>
         </div>
