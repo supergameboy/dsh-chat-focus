@@ -45,6 +45,9 @@
     "bundle": "tsdown",
     "watch": "tsdown --watch",
     "typecheck": "tsc --noEmit",
+    "decl": "tsc -p tsconfig.decl.json",
+    "build": "pnpm run typecheck && pnpm run decl && pnpm run bundle",
+    "prepublishOnly": "pnpm run build",
     "test:engine": "node --import tsx/esm tests/engine.check.ts",
     "setup:links": "node scripts/setup-junctions.mjs",
     "install:profile": "node scripts/install.mjs",
@@ -116,6 +119,7 @@
     "lib/index.js",
     "lib/invariant.js",
     "lib/client.js",
+    "lib/client.js.map",
     "lib/types/**/*.d.ts",
     "cordis.patch.yml"
   ]
