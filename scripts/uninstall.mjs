@@ -87,12 +87,18 @@ copyFileSync(manifest, backup)
 process.stdout.write(`backed up ${manifest} -> ${backup}\n`)
 
 process.stdout.write(`removing ${PACKAGE_NAME} from profile '${profile}' ...\n`)
-const result = spawnSync('dsh', ['plugin', '--profile', profile, 'remove', PACKAGE_NAME], {
-  stdio: 'inherit',
-  shell: process.platform === 'win32',
-})
-if (result.error !== undefined) throw result.error
-if (result.status !== 0) throw new Error(`dsh plugin remove failed (exit ${result.status})`)
+const preRemove = JSON.parse(readFileSync(manifest, 'utf8'))
+const dependencyPresent = preRemove.dependencies?.[PACKAGE_NAME] !== undefined
+if (dependencyPresent) {
+  const result = spawnSync('dsh', ['plugin', '--profile', profile, 'remove', PACKAGE_NAME], {
+    stdio: 'inherit',
+    shell: process.platform === 'win32',
+  })
+  if (result.error !== undefined) throw result.error
+  if (result.status !== 0) throw new Error(`dsh plugin remove failed (exit ${result.status})`)
+} else {
+  process.stdout.write(`note: '${PACKAGE_NAME}' was not a profile dependency — nothing to remove\n`)
+}
 
 const json = JSON.parse(readFileSync(manifest, 'utf8'))
 if (json.dsh?.profile?.bundles?.includes(PACKAGE_NAME)) {
@@ -106,7 +112,8 @@ if (cleanSettings) {
   if (existsSync(settings)) {
     copyFileSync(settings, `${settings}.dsh-chat-focus.bak`)
     // Line-scoped cleanup: inside the ui-conversation section, drop lines
-    // whose key starts with 'focus' (the fork's extension fields).
+    // whose key starts with 'focus' (the fork's extension fields); drop the
+    // section header too when no other field remains under it.
     const lines = readFileSync(settings, 'utf8').split(/\r?\n/)
     let inSection = false
     const kept = []
@@ -114,6 +121,12 @@ if (cleanSettings) {
       if (/^\S/.test(line)) inSection = line === 'ui-conversation:'
       if (inSection && /^\s+focus[A-Za-z]*:/.test(line)) continue
       kept.push(line)
+    }
+    const headerIndex = kept.findIndex(line => line === 'ui-conversation:')
+    if (headerIndex >= 0) {
+      const next = kept.slice(headerIndex + 1)
+      const hasFields = next.some(line => /^\s+\S/.test(line))
+      if (!hasFields) kept.splice(headerIndex, 1)
     }
     writeFileSync(settings, `${kept.join('\n')}\n`, 'utf8')
     process.stdout.write(`cleaned focus* fields from settings.yaml (backup: ${settings}.dsh-chat-focus.bak)\n`)
