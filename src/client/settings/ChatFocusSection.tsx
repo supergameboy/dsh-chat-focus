@@ -17,7 +17,7 @@ import {
 import type { ChatBubbleCustomStyle } from '../chat/bubbles/ChatBubble.tsx'
 import { RuntimeFoldBox, type RuntimeFoldBoxProps } from '../chat/bubbles/RuntimeFoldBox.tsx'
 import { ChatBubble } from '../chat/bubbles/ChatBubble.tsx'
-import { ImageCropper } from './ImageCropper.tsx'
+import { ImageCropper, compressImageDataUrl } from './ImageCropper.tsx'
 import type { ConversationKey } from '../locales.ts'
 import css from './ChatFocusSection.module.css'
 
@@ -314,7 +314,12 @@ function BgImageField({ value, onChange, t }: {
     setUploadError(null)
     const reader = new FileReader()
     reader.onload = () => {
-      if (typeof reader.result === 'string') setCropSource(reader.result)
+      if (typeof reader.result !== 'string') return
+      // Downscale before cropping so the exported settings value stays small
+      // enough for the settings write to succeed reliably.
+      void compressImageDataUrl(reader.result).then(setCropSource, () => {
+        setUploadError(t('focus.uploadTooLarge'))
+      })
     }
     reader.readAsDataURL(file)
   }
@@ -417,7 +422,11 @@ function BubbleSideEditor({ side, focus, setField, t }: {
             from={value('GradientFrom')}
             to={value('GradientTo')}
             angle={value('GradientAngle')}
-            onChangeFrom={next => set('GradientFrom', next)}
+            onChangeFrom={next => {
+              set('GradientFrom', next)
+              // Gradient and background image are mutually exclusive.
+              if (next !== '') set('BgImage', '')
+            }}
             onChangeTo={next => set('GradientTo', next)}
             onChangeAngle={next => set('GradientAngle', next)}
             t={t}
@@ -465,7 +474,19 @@ function BubbleSideEditor({ side, focus, setField, t }: {
       <Row
         title={t('focus.customBgImage')}
         hint={t('focus.customBgImageHint')}
-        control={<BgImageField value={value('BgImage')} onChange={next => set('BgImage', next)} t={t} />}
+        control={(
+          <BgImageField
+            value={value('BgImage')}
+            onChange={next => {
+              set('BgImage', next)
+              // A background image and a gradient are mutually exclusive:
+              // setting an image disables the gradient so it cannot silently
+              // override the picture.
+              if (next !== '') set('GradientFrom', '')
+            }}
+            t={t}
+          />
+        )}
       />
       <Row
         title={t('focus.bgSize')}

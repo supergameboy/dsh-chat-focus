@@ -15,7 +15,7 @@ interface CropRect {
 }
 
 const MIN_FRAME = 0.05
-const MAX_OUTPUT_WIDTH = 1600
+const MAX_OUTPUT_WIDTH = 1200
 
 /** Read the fitted display size of an image inside a container (contain-fit). */
 function fitSize(naturalWidth: number, naturalHeight: number, maxWidth: number, maxHeight: number): { w: number; h: number } {
@@ -136,7 +136,12 @@ export function ImageCropper({ imageUrl, onConfirm, onCancel }: ImageCropperProp
             <div className={css.gridV} />
             <div
               className={css.handle}
-              onPointerDown={onPointerDown('resize')}
+              onPointerDown={(event) => {
+                // The handle sits inside the move frame; stop propagation so
+                // the resize gesture is not overridden by the frame's move.
+                event.stopPropagation()
+                onPointerDown('resize')(event)
+              }}
               onPointerMove={onPointerMove}
               onPointerUp={endGesture}
               onPointerCancel={endGesture}
@@ -154,4 +159,34 @@ export function ImageCropper({ imageUrl, onConfirm, onCancel }: ImageCropperProp
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value))
+}
+
+/**
+ * Downscale an image data URI before cropping: long side capped at 1200px,
+ * JPEG 0.82. Keeps the exported settings value small enough for the settings
+ * RPC/write to succeed reliably.
+ * @param dataUrl - source image (any browser-decodable format).
+ * @returns a compressed JPEG data URI.
+ */
+export function compressImageDataUrl(dataUrl: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const image = new Image()
+    image.onload = () => {
+      const scale = Math.min(1, MAX_OUTPUT_WIDTH / image.naturalWidth)
+      const width = Math.max(1, Math.round(image.naturalWidth * scale))
+      const height = Math.max(1, Math.round(image.naturalHeight * scale))
+      const canvas = document.createElement('canvas')
+      canvas.width = width
+      canvas.height = height
+      const ctx = canvas.getContext('2d')
+      if (ctx === null) {
+        reject(new Error('canvas 2d context unavailable'))
+        return
+      }
+      ctx.drawImage(image, 0, 0, width, height)
+      resolve(canvas.toDataURL('image/jpeg', 0.82))
+    }
+    image.onerror = () => { reject(new Error('image decode failed')) }
+    image.src = dataUrl
+  })
 }
