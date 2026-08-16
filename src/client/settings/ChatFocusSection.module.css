@@ -92,6 +92,8 @@
 
 .rowControl {
   flex: none;
+  max-width: 62%;
+  min-width: 0;
 }
 
 .checkbox {
@@ -167,6 +169,8 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
+  min-width: 0;
 }
 
 .gradientAngle {
@@ -194,6 +198,8 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
+  min-width: 0;
 }
 
 .colorPicker {
