@@ -1,5 +1,6 @@
-/* ChatBubble: left/right chat-bubble chrome. Colors map to host dsw alias
-   tokens only (deep-mode follows automatically); the compact variant lowers
+/* ChatBubble: assistant reply bubble chrome. Colors map to host dsw alias
+   tokens by default; user-defined overrides arrive as CSS variables
+   (--cf-bubble-*) set inline by the component. The compact variant lowers
    density. */
 
 .bubble {
@@ -7,7 +8,7 @@
   flex-direction: column;
   gap: 6px;
   min-width: 0;
-  max-width: 720px;
+  max-width: var(--cf-bubble-max-width, 720px);
 }
 
 .assistant {
@@ -45,21 +46,18 @@
 
 .content {
   min-width: 0;
-  border-radius: 12px;
+  border-radius: var(--cf-bubble-radius, 12px);
   padding: 10px 14px;
   overflow-wrap: anywhere;
+  background-color: var(--cf-bubble-bg, var(--dsw-alias-bg-layer-2));
+  border: 1px solid var(--cf-bubble-border, var(--dsw-alias-border-l1));
+  background-image: var(--cf-bubble-bg-image, none);
+  background-size: cover;
+  background-position: center;
 }
 
 .assistant .content {
-  border: 1px solid var(--dsw-alias-border-l1);
-  background: var(--dsw-alias-bg-layer-2);
-  border-top-left-radius: 4px;
-}
-
-.user .content {
-  border: 1px solid color-mix(in oklab, var(--dsw-alias-brand-primary) 30%, transparent);
-  background: color-mix(in oklab, var(--dsw-alias-brand-primary) 12%, transparent);
-  border-top-right-radius: 4px;
+  border-top-left-radius: var(--cf-bubble-corner, 4px);
 }
 
 .compact .content {
@@ -69,8 +67,4 @@
 
 .compact.assistant .content {
   border-top-left-radius: 3px;
-}
-
-.compact.user .content {
-  border-top-right-radius: 3px;
 }

@@ -17,7 +17,7 @@
 // ChatNodeSeat subscribes to one Node key, so Assistant deltas and Tool
 // lifecycle updates replace only their own row without remounting it.
 
-import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { ConversationTimelineSnapshot } from '@deepseek-ai/dsh-client-runtime/client'
 import type { ChatConversationViewNode } from '@deepseek-ai/dsh-client-runtime/client'
@@ -164,7 +164,8 @@ function groupKey(group: GroupRow): string {
   return group.kind === 'runtime-run' ? `run:${group.anchorKey}` : group.nodeKey
 }
 
-/** One rendered group row: bubble rows, runtime fold box + kept-visible tail, or plain rows. */
+/** One rendered group row: reply bubble rows, runtime fold box, or plain rows
+ *  (the host user row already renders its own bubble chrome). */
 function FocusGroupRow({ group, focus, nodeStore, renderSeat, t }: {
   group: GroupRow
   focus: ConversationSettings
@@ -173,43 +174,26 @@ function FocusGroupRow({ group, focus, nodeStore, renderSeat, t }: {
   t: ChatViewSlotProps['t']
 }) {
   if (group.kind === 'runtime-run') {
-    const anchorOnBox = group.inside.length > 0
     return (
-      <Fragment>
-        {anchorOnBox && (
-          <div
-            className={css.flowItem}
-            data-chat-anchor-key={group.anchorKey}
-            data-chat-flow-key={`run:${group.anchorKey}`}
-            data-chat-flow-kind="runtime-run"
-          >
-            <RuntimeFoldBox
-              anchorKey={group.anchorKey}
-              insideKeys={group.inside}
-              summary={group.summary}
-              defaultOpen={focus.focusDefaultOpen}
-              summaryVisible={focus.focusSummary}
-              keepVisible={focus.focusKeepVisible}
-              t={t}
-              renderNode={renderSeat}
-            />
-          </div>
-        )}
-        {group.outside.map(nodeKey => (
-          <div
-            key={nodeKey}
-            className={css.flowItem}
-            data-chat-anchor-key={anchorOnBox ? undefined : group.anchorKey}
-            data-chat-flow-key={nodeKey}
-            data-chat-flow-kind="runtime-outside"
-          >
-            {renderSeat(nodeKey)}
-          </div>
-        ))}
-      </Fragment>
+      <div
+        className={css.flowItem}
+        data-chat-anchor-key={group.anchorKey}
+        data-chat-flow-key={`run:${group.anchorKey}`}
+        data-chat-flow-kind="runtime-run"
+      >
+        <RuntimeFoldBox
+          anchorKey={group.anchorKey}
+          insideKeys={group.inside}
+          summary={group.summary}
+          defaultOpen={group.recent || focus.focusDefaultOpen}
+          summaryVisible={focus.focusSummary}
+          t={t}
+          renderNode={renderSeat}
+        />
+      </div>
     )
   }
-  if (group.kind === 'tail' || group.kind === 'other') {
+  if (group.kind === 'tail' || group.kind === 'other' || group.kind === 'user') {
     return (
       <div className={css.flowItem} data-chat-flow-key={group.nodeKey} data-chat-flow-kind={group.kind}>
         {renderSeat(group.nodeKey)}
@@ -223,9 +207,16 @@ function FocusGroupRow({ group, focus, nodeStore, renderSeat, t }: {
       {focus.focusBubbles
         ? (
           <ChatBubble
-            role={group.kind === 'user' ? 'user' : 'assistant'}
+            role="assistant"
             compact={focus.focusBubbleStyle === 'compact'}
             {...(time !== undefined ? { time } : {})}
+            custom={{
+              bg: focus.focusBubbleBg,
+              border: focus.focusBubbleBorder,
+              radius: focus.focusBubbleRadius,
+              maxWidth: focus.focusBubbleMaxWidth,
+              bgImage: focus.focusBubbleBgImage,
+            }}
           >
             {content}
           </ChatBubble>

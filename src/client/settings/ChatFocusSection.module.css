@@ -132,6 +132,48 @@
   margin-top: 6px;
 }
 
+.customBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 0 4px;
+  border-top: 1px dashed var(--dsw-alias-border-l2);
+  margin-top: 6px;
+}
+
+.customTitle {
+  font: var(--dsw-font-s-strong-14);
+  color: var(--dsw-alias-label-primary);
+  padding-bottom: 4px;
+}
+
+.textInput {
+  width: 200px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font: var(--dsw-font-s-strong-14);
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-alias-bg-base);
+}
+
+.resetButton {
+  align-self: flex-start;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 6px;
+  padding: 4px 12px;
+  font-size: 12px;
+  color: var(--dsw-alias-label-secondary);
+  background: var(--dsw-alias-bg-base);
+  cursor: pointer;
+  margin: 4px 0 0 8px;
+}
+
+.resetButton:hover {
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
 .previewLabel {
   font: var(--dsw-font-xs-13);
   color: var(--dsw-alias-label-tertiary);

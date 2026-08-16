@@ -23,7 +23,7 @@ export const DEFAULT_BUSY_ENTER_BEHAVIOR: BusyEnterBehavior = 'queue'
 export const FOCUS_ENABLED_FIELD = 'focusEnabled'
 /** Chat bubble chrome for user/assistant text replies. */
 export const FOCUS_BUBBLES_FIELD = 'focusBubbles'
-/** Runtime-run rows kept visible outside the fold box (most recent N). */
+/** Most recent N replies whose runtime runs render expanded (older runs fold). */
 export const FOCUS_KEEP_VISIBLE_FIELD = 'focusKeepVisible'
 /** Whether fold boxes start expanded. */
 export const FOCUS_DEFAULT_OPEN_FIELD = 'focusDefaultOpen'
@@ -41,6 +41,16 @@ export type FocusBubbleStyle = typeof FOCUS_BUBBLE_STYLES[number]
 export const FOCUS_BUBBLE_STYLE_FIELD = 'focusBubbleStyle'
 /** Whether text-less reasoning steps join the runtime run. */
 export const FOCUS_REASONING_FIELD = 'focusReasoning'
+/** Custom assistant-bubble background (CSS color; empty = theme default). */
+export const FOCUS_BUBBLE_BG_FIELD = 'focusBubbleBg'
+/** Custom assistant-bubble border color (CSS color; empty = theme default). */
+export const FOCUS_BUBBLE_BORDER_FIELD = 'focusBubbleBorder'
+/** Custom assistant-bubble corner radius (CSS length; empty = theme default). */
+export const FOCUS_BUBBLE_RADIUS_FIELD = 'focusBubbleRadius'
+/** Custom assistant-bubble max width (CSS length; empty = theme default). */
+export const FOCUS_BUBBLE_MAX_WIDTH_FIELD = 'focusBubbleMaxWidth'
+/** Custom assistant-bubble background image (URL or data URI; empty = none). */
+export const FOCUS_BUBBLE_BG_IMAGE_FIELD = 'focusBubbleBgImage'
 
 /** Defaults shared by the schema, the client scope, and the grouping engine. */
 export const DEFAULT_FOCUS_ENABLED = true
@@ -51,6 +61,11 @@ export const DEFAULT_FOCUS_SUMMARY = true
 export const DEFAULT_FOCUS_STRATEGY: FocusFoldStrategy = 'keep-recent'
 export const DEFAULT_FOCUS_BUBBLE_STYLE: FocusBubbleStyle = 'default'
 export const DEFAULT_FOCUS_REASONING = true
+export const DEFAULT_FOCUS_BUBBLE_BG = ''
+export const DEFAULT_FOCUS_BUBBLE_BORDER = ''
+export const DEFAULT_FOCUS_BUBBLE_RADIUS = ''
+export const DEFAULT_FOCUS_BUBBLE_MAX_WIDTH = ''
+export const DEFAULT_FOCUS_BUBBLE_BG_IMAGE = ''
 
 /** Static defaults the client uses while the namespace is loading or unavailable. */
 export const DEFAULT_CONVERSATION_SETTINGS: ConversationSettings = {
@@ -63,6 +78,11 @@ export const DEFAULT_CONVERSATION_SETTINGS: ConversationSettings = {
   focusStrategy: DEFAULT_FOCUS_STRATEGY,
   focusBubbleStyle: DEFAULT_FOCUS_BUBBLE_STYLE,
   focusReasoning: DEFAULT_FOCUS_REASONING,
+  focusBubbleBg: DEFAULT_FOCUS_BUBBLE_BG,
+  focusBubbleBorder: DEFAULT_FOCUS_BUBBLE_BORDER,
+  focusBubbleRadius: DEFAULT_FOCUS_BUBBLE_RADIUS,
+  focusBubbleMaxWidth: DEFAULT_FOCUS_BUBBLE_MAX_WIDTH,
+  focusBubbleBgImage: DEFAULT_FOCUS_BUBBLE_BG_IMAGE,
 }
 
 /** Durable ChatFocus display section. */
@@ -71,7 +91,7 @@ export interface ChatFocusSettings {
   focusEnabled: boolean
   /** Chat bubble chrome. */
   focusBubbles: boolean
-  /** Runtime rows kept visible outside the fold box. */
+  /** Most recent N replies whose runtime runs render expanded. */
   focusKeepVisible: number
   /** Fold boxes start expanded. */
   focusDefaultOpen: boolean
@@ -83,6 +103,16 @@ export interface ChatFocusSettings {
   focusBubbleStyle: FocusBubbleStyle
   /** Text-less reasoning steps join the runtime run. */
   focusReasoning: boolean
+  /** Custom assistant-bubble background color (empty = theme default). */
+  focusBubbleBg: string
+  /** Custom assistant-bubble border color (empty = theme default). */
+  focusBubbleBorder: string
+  /** Custom assistant-bubble corner radius (empty = theme default). */
+  focusBubbleRadius: string
+  /** Custom assistant-bubble max width (empty = theme default). */
+  focusBubbleMaxWidth: string
+  /** Custom assistant-bubble background image (empty = none). */
+  focusBubbleBgImage: string
 }
 
 /** Durable conversation section shared by the Host schema and the browser scope. */
@@ -102,4 +132,9 @@ export const ConversationSettingsSchema: z<ConversationSettings> = z.object({
   [FOCUS_STRATEGY_FIELD]: z.union([...FOCUS_STRATEGIES]).default(DEFAULT_FOCUS_STRATEGY),
   [FOCUS_BUBBLE_STYLE_FIELD]: z.union([...FOCUS_BUBBLE_STYLES]).default(DEFAULT_FOCUS_BUBBLE_STYLE),
   [FOCUS_REASONING_FIELD]: z.boolean().default(DEFAULT_FOCUS_REASONING),
+  [FOCUS_BUBBLE_BG_FIELD]: z.string().default(DEFAULT_FOCUS_BUBBLE_BG),
+  [FOCUS_BUBBLE_BORDER_FIELD]: z.string().default(DEFAULT_FOCUS_BUBBLE_BORDER),
+  [FOCUS_BUBBLE_RADIUS_FIELD]: z.string().default(DEFAULT_FOCUS_BUBBLE_RADIUS),
+  [FOCUS_BUBBLE_MAX_WIDTH_FIELD]: z.string().default(DEFAULT_FOCUS_BUBBLE_MAX_WIDTH),
+  [FOCUS_BUBBLE_BG_IMAGE_FIELD]: z.string().default(DEFAULT_FOCUS_BUBBLE_BG_IMAGE),
 })

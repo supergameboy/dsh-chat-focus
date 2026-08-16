@@ -36,8 +36,8 @@
   width: 20px;
   height: 20px;
   border-radius: 6px;
-  color: var(--dsw-alias-brand-text);
-  background: var(--dsw-alias-brand-primary);
+  color: var(--dsw-alias-label-secondary);
+  background: var(--dsw-alias-bg-layer-2);
 }
 
 .summaryText {
@@ -76,6 +76,7 @@
 .body {
   max-height: 360px;
   overflow-y: auto;
+  overflow-x: hidden;
   border-top: 1px solid var(--dsw-alias-border-l1);
   display: flex;
   flex-direction: column;
@@ -86,6 +87,21 @@
 
 .bodyItem {
   min-width: 0;
+  max-width: 100%;
+}
+
+/* Host node rows (ReasoningRow, tool rows, markdown code) must never push the
+   fold body past the column width: constrain every child to the body width.
+   Element selectors stay global under CSS Modules. */
+.bodyItem > * {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.bodyItem pre,
+.bodyItem code {
+  max-width: 100%;
+  overflow-x: auto;
 }
 
 @keyframes dsh-focus-fold-body-in {

@@ -26,13 +26,16 @@ export type GroupRow =
   | { readonly kind: 'tail'; readonly nodeKey: string }
   | {
       readonly kind: 'runtime-run'
-      /** Node keys collapsed inside the fold box (older than the visible tail). */
+      /** Node keys inside the fold box. */
       readonly inside: readonly string[]
-      /** Node keys kept visible outside the fold box (the most recent N). */
-      readonly outside: readonly string[]
       readonly summary: RuntimeSummary
       /** Stable anchor identity: the first node key of the run. */
       readonly anchorKey: string
+      /**
+       * Whether this run belongs to one of the most recent `focusKeepVisible`
+       * replies: such runs render expanded by default; older runs fold.
+       */
+      readonly recent: boolean
     }
 
 /** Tool-name display cap in the fold summary line. */
@@ -110,17 +113,35 @@ export interface NodeLookup {
   get(key: string): ChatConversationViewNode | undefined
 }
 
+/** One pending run waiting for its following reply during the scan. */
+interface PendingRun {
+  readonly keys: string[]
+  readonly summary: RuntimeSummary
+}
+
+/** Intermediate row before recent-marking: a run remembers its following reply's ordinal. */
+type BuiltRow =
+  | { readonly kind: 'run'; readonly run: PendingRun; readonly afterReplySeq: number | null }
+  | { readonly kind: 'node'; readonly nodeKey: string; readonly klass: 'user' | 'reply' | 'tail' | 'other' }
+
 /**
  * Build the focus row sequence from the ordered node keys.
+ *
+ * Runs fold by default; the runs belonging to the most recent
+ * `focusKeepVisible` replies (counted from the flow tail) are marked `recent`
+ * and render expanded. A run still open at the tail (no following reply yet)
+ * counts as recent while `focusKeepVisible > 0`, so live activity stays
+ * visible during streaming.
+ *
  * @param order - stable node key order from the conversation snapshot.
  * @param nodes - node store (get by key).
- * @param settings - focus settings (focusEnabled / focusKeepVisible / focusStrategy / focusReasoning).
+ * @param settings - focus settings (focusEnabled / focusKeepVisible / focusReasoning).
  * @returns the group rows; when disabled, rows pass through in original order.
  */
 export function buildGroups(
   order: readonly string[],
   nodes: NodeLookup,
-  settings: Pick<ChatFocusSettings, 'focusEnabled' | 'focusKeepVisible' | 'focusStrategy' | 'focusReasoning'>,
+  settings: Pick<ChatFocusSettings, 'focusEnabled' | 'focusKeepVisible' | 'focusReasoning'>,
 ): GroupRow[] {
   if (!settings.focusEnabled) {
     const rows: GroupRow[] = []
@@ -132,22 +153,19 @@ export function buildGroups(
     return rows
   }
 
-  const rows: GroupRow[] = []
-  let run: { keys: string[]; summary: RuntimeSummary } | null = null
-  const flushRun = (): void => {
-    if (run === null) return
-    const keep = settings.focusStrategy === 'always'
-      ? 0
-      : settings.focusKeepVisible
-    const split = Math.max(0, run.keys.length - keep)
-    rows.push({
-      kind: 'runtime-run',
-      inside: run.keys.slice(0, split),
-      outside: run.keys.slice(split),
-      summary: run.summary,
-      anchorKey: run.keys[0] ?? '',
+  const built: BuiltRow[] = []
+  let openRun: PendingRun | null = null
+  let replySeq = 0
+  const flushRun = (atTail: boolean): void => {
+    if (openRun === null) return
+    built.push({
+      kind: 'run',
+      run: openRun,
+      // The ordinal of the first reply that follows this run; null only when
+      // the run stays open at the flow tail (no following node at all).
+      afterReplySeq: atTail ? null : replySeq + 1,
     })
-    run = null
+    openRun = null
   }
 
   for (const key of order) {
@@ -155,14 +173,32 @@ export function buildGroups(
     if (node === undefined) continue
     const klass = classifyNode(node, settings)
     if (klass === 'runtime') {
-      if (run === null) run = { keys: [], summary: EMPTY_SUMMARY }
-      run.keys.push(key)
-      run.summary = updateSummary(run.summary, node)
+      if (openRun === null) openRun = { keys: [], summary: EMPTY_SUMMARY }
+      openRun = { keys: [...openRun.keys, key], summary: updateSummary(openRun.summary, node) }
       continue
     }
-    flushRun()
-    rows.push({ kind: klass === 'tail' ? 'tail' : klass === 'user' ? 'user' : 'reply', nodeKey: key })
+    flushRun(false)
+    if (klass === 'reply') replySeq += 1
+    built.push({ kind: 'node', nodeKey: key, klass: klass === 'tail' ? 'tail' : klass })
   }
-  flushRun()
+  flushRun(true)
+
+  // Mark the runs of the most recent N replies (plus any tail-open run).
+  const rows: GroupRow[] = []
+  for (const row of built) {
+    if (row.kind === 'node') {
+      rows.push({ kind: row.klass, nodeKey: row.nodeKey })
+      continue
+    }
+    const recent = settings.focusKeepVisible > 0
+      && (row.afterReplySeq === null || row.afterReplySeq > replySeq - settings.focusKeepVisible)
+    rows.push({
+      kind: 'runtime-run',
+      inside: row.run.keys,
+      summary: row.run.summary,
+      anchorKey: row.run.keys[0] ?? '',
+      recent,
+    })
+  }
   return rows
 }

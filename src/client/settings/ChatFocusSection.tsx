@@ -208,23 +208,111 @@ export const ChatFocusSection = memo(function ChatFocusSection({
               />
             )}
           />
+          <div className={css.customBlock}>
+            <span className={css.customTitle}>{t('focus.customGroup')}</span>
+            <Row
+              title={t('focus.customBg')}
+              hint={t('focus.customHint')}
+              control={(
+                <input
+                  type="text"
+                  className={css.textInput}
+                  placeholder="#eef4ff"
+                  value={focus.focusBubbleBg}
+                  onChange={event => setField('focusBubbleBg', event.target.value)}
+                />
+              )}
+            />
+            <Row
+              title={t('focus.customBorder')}
+              hint={t('focus.customHint')}
+              control={(
+                <input
+                  type="text"
+                  className={css.textInput}
+                  placeholder="#d0d7de"
+                  value={focus.focusBubbleBorder}
+                  onChange={event => setField('focusBubbleBorder', event.target.value)}
+                />
+              )}
+            />
+            <Row
+              title={t('focus.customRadius')}
+              hint={t('focus.customHint')}
+              control={(
+                <input
+                  type="text"
+                  className={css.textInput}
+                  placeholder="12px"
+                  value={focus.focusBubbleRadius}
+                  onChange={event => setField('focusBubbleRadius', event.target.value)}
+                />
+              )}
+            />
+            <Row
+              title={t('focus.customMaxWidth')}
+              hint={t('focus.customHint')}
+              control={(
+                <input
+                  type="text"
+                  className={css.textInput}
+                  placeholder="720px"
+                  value={focus.focusBubbleMaxWidth}
+                  onChange={event => setField('focusBubbleMaxWidth', event.target.value)}
+                />
+              )}
+            />
+            <Row
+              title={t('focus.customBgImage')}
+              hint={t('focus.customBgImageHint')}
+              control={(
+                <input
+                  type="text"
+                  className={css.textInput}
+                  placeholder="https://… 或 data:image/…"
+                  value={focus.focusBubbleBgImage}
+                  onChange={event => setField('focusBubbleBgImage', event.target.value)}
+                />
+              )}
+            />
+            <button
+              type="button"
+              className={css.resetButton}
+              onClick={() => {
+                setField('focusBubbleBg', '')
+                setField('focusBubbleBorder', '')
+                setField('focusBubbleRadius', '')
+                setField('focusBubbleMaxWidth', '')
+                setField('focusBubbleBgImage', '')
+              }}
+            >
+              {t('focus.customReset')}
+            </button>
+          </div>
           <div className={css.previewWrap}>
             <span className={css.previewLabel}>{t('focus.preview')} · {t('focus.previewExample')}</span>
             <RuntimeFoldBox
               {...PREVIEW_RUN}
-              defaultOpen={false}
+              defaultOpen={focus.focusDefaultOpen}
               summaryVisible={focus.focusSummary}
-              keepVisible={focus.focusKeepVisible}
               t={t}
               renderNode={key => (
                 <PreviewNode key={key} label={key === 'preview-1' ? 'read' : key === 'preview-2' ? 'glob' : '思考'} />
               )}
             />
-            <ChatBubble role="assistant" compact={focus.focusBubbleStyle === 'compact'} time={Date.now()}>
+            <ChatBubble
+              role="assistant"
+              compact={focus.focusBubbleStyle === 'compact'}
+              time={Date.now()}
+              custom={{
+                bg: focus.focusBubbleBg,
+                border: focus.focusBubbleBorder,
+                radius: focus.focusBubbleRadius,
+                maxWidth: focus.focusBubbleMaxWidth,
+                bgImage: focus.focusBubbleBgImage,
+              }}
+            >
               <div className={css.previewReply}>这是正式回复示例文本。</div>
-            </ChatBubble>
-            <ChatBubble role="user" compact={focus.focusBubbleStyle === 'compact'} time={Date.now()}>
-              <div className={css.previewReply}>这是用户消息示例。</div>
             </ChatBubble>
           </div>
         </div>
