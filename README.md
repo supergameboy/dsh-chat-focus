@@ -18,8 +18,8 @@ dsh web 对话界面插件：将文本回复之前的**连续运行时信息**�
 一键脚本（推荐，含备份与校验）：
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File scripts\install.ps1          # 默认 web profile
-powershell -ExecutionPolicy Bypass -File scripts\install.ps1 -Profile web
+node scripts/install.mjs
+node scripts/install.mjs
 ```
 
 等价手动步骤：
@@ -35,8 +35,8 @@ bundle 的 patch 层（`bundle/cordis.patch.yml`）由 loader 自动应用：宿
 ## 卸载
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File scripts\uninstall.ps1                 # 保留设置字段残留（无害）
-powershell -ExecutionPolicy Bypass -File scripts\uninstall.ps1 -CleanSettings  # 同时清理 settings.yaml 的 focus* 字段
+node scripts/uninstall.mjs
+node scripts/uninstall.mjs
 ```
 
 等价手动步骤：`dsh plugin --profile web remove dsh-chat-focus` + 重启。
@@ -51,7 +51,7 @@ pnpm run typecheck  # tsc --noEmit（类型契约来自宿主 lib/types 构建�
 pnpm run bundle     # tsdown：lib/index.js（node 半区）+ lib/client.js（浏览器 bundle）
 ```
 
-> 开发环境说明：`pnpm-workspace.yaml` 将 `../deepseek-harness/packages/*/*` 与 `../deepseek-harness/vendor/*` 列为 workspace 成员（精确 rc.5 契约）。若 pnpm 因跨目录 workspace 未生成 node_modules，按 `scripts/setup-junctions.ps1` 手工链接构建依赖（react/clsx/typescript/tsdown/lightningcss/@types/react/@deepseek-ai/cordis|cosmokit|schemastery|dsh-settings）。**不要**在本仓库运行会改写宿主 node_modules 的 pnpm 命令。
+> 开发环境说明：`pnpm-workspace.yaml` 将 `../deepseek-harness/packages/*/*` 与 `../deepseek-harness/vendor/*` 列为 workspace 成员（精确 rc.5 契约）。若 pnpm 因跨目录 workspace 未生成 node_modules，按 `scripts/setup-junctions.mjs` 手工链接构建依赖（react/clsx/typescript/tsdown/lightningcss/@types/react/@deepseek-ai/cordis|cosmokit|schemastery|dsh-settings）。**不要**在本仓库运行会改写宿主 node_modules 的 pnpm 命令。
 
 ## 配置
 
@@ -71,8 +71,8 @@ pnpm run bundle     # tsdown：lib/index.js（node 半区）+ lib/client.js（�
 ## 卸载
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File scripts\uninstall.ps1                 # 保留设置字段残留（无害）
-powershell -ExecutionPolicy Bypass -File scripts\uninstall.ps1 -CleanSettings  # 同时清理 settings.yaml 的 focus* 字段
+node scripts/uninstall.mjs
+node scripts/uninstall.mjs
 ```
 
 等价手动步骤：`dsh plugin --profile web remove dsh-chat-focus` + 重启。

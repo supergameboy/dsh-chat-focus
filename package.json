@@ -37,7 +37,10 @@
   "scripts": {
     "bundle": "tsdown",
     "watch": "tsdown --watch",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "setup:links": "node scripts/setup-junctions.mjs",
+    "install:profile": "node scripts/install.mjs",
+    "uninstall:profile": "node scripts/uninstall.mjs"
   },
   "license": "MIT",
   "dependencies": {
