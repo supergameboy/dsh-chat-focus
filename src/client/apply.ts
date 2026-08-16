@@ -114,6 +114,48 @@ function selectApproval({ interactions }: ComposerChainProps): ApprovalWait | nu
   return interactions.find((i): i is ApprovalWait => i.kind === 'approval') ?? null
 }
 
+/** Floating runtime-error bar id (also the removal handle). */
+const GLOBAL_ERROR_BAR_ID = 'cf-global-error-bar'
+
+/**
+ * Captures errors that escape the React tree (async callbacks, event
+ * handlers, promise rejections) — the error boundaries cannot see those —
+ * and surfaces them as a dismissible red bar at the top of the page. This is
+ * what makes a blank conversation column diagnosable instead of silent.
+ */
+function installGlobalErrorReporter(ctx: Context): void {
+  if (typeof window === 'undefined') return
+  const show = (message: string): void => {
+    let bar = document.getElementById(GLOBAL_ERROR_BAR_ID)
+    if (bar === null) {
+      bar = document.createElement('div')
+      bar.id = GLOBAL_ERROR_BAR_ID
+      bar.style.cssText = 'position:fixed;top:8px;left:50%;transform:translateX(-50%);'
+        + 'z-index:99999;max-width:80vw;padding:8px 14px;border-radius:8px;'
+        + 'background:rgba(190,18,60,0.95);color:#fff;font:12px/18px sans-serif;'
+        + 'box-shadow:0 4px 16px rgba(0,0,0,0.3);cursor:pointer;word-break:break-all;'
+      bar.addEventListener('click', () => { bar?.remove() })
+      document.body.appendChild(bar)
+    }
+    bar.textContent = `dsh-chat-focus 运行时错误：${message}（点击关闭）`
+  }
+  const onError = (event: ErrorEvent): void => {
+    if (event.message !== undefined && event.message !== '') show(event.message)
+  }
+  const onRejection = (event: PromiseRejectionEvent): void => {
+    const reason = event.reason
+    const message = reason instanceof Error ? reason.message : String(reason)
+    if (message !== '' && message !== 'undefined') show(message)
+  }
+  window.addEventListener('error', onError)
+  window.addEventListener('unhandledrejection', onRejection)
+  ctx.effect(() => () => {
+    window.removeEventListener('error', onError)
+    window.removeEventListener('unhandledrejection', onRejection)
+    document.getElementById(GLOBAL_ERROR_BAR_ID)?.remove()
+  })
+}
+
 /** Mounts the conversation plugin.
  * @param ctx - Client root context.
  */
@@ -122,6 +164,8 @@ export function apply(ctx: Context): void {
   const workspaces = ctx.workspaces
   const layout = ctx.layout
   const slots = ctx.slots
+
+  installGlobalErrorReporter(ctx)
 
   registerConversationNodes(ctx)
   registerChatNodeRenderers(ctx)
