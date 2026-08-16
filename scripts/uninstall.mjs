@@ -11,11 +11,15 @@
  * Usage: node scripts/uninstall.mjs [--profile web] [--clean-settings]
  */
 import { spawnSync } from 'node:child_process'
-import { copyFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs'
+import {
+  copyFileSync, existsSync, lstatSync, readFileSync, realpathSync, rmSync, writeFileSync,
+} from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 const PACKAGE_NAME = 'dsh-chat-focus'
+const repoRoot = fileURLToPath(new URL('..', import.meta.url))
 
 function parseArgs(argv) {
   const options = { profile: 'web', cleanSettings: false, help: false }
@@ -36,10 +40,42 @@ function dshHome() {
   return process.env.DSH_HOME ?? join(homedir(), '.dsh')
 }
 
+/**
+ * pnpm `link:` dependencies leave their directory link in the profile
+ * node_modules after remove; clear it when it points at our checkout.
+ * @param profileDir - the profile directory.
+ */
+function removeLeftoverLink(profileDir) {
+  const link = join(profileDir, 'node_modules', PACKAGE_NAME)
+  if (!existsSync(link)) return
+  try {
+    lstatSync(link)
+  } catch {
+    return // raced away
+  }
+  let target
+  try {
+    target = realpathSync(link)
+  } catch {
+    rmSync(link, { recursive: true, force: true })
+    process.stdout.write(`removed stale node_modules link: ${link}\n`)
+    return
+  }
+  if (target === realpathSync(repoRoot)) {
+    rmSync(link, { recursive: true, force: true })
+    process.stdout.write(`removed stale node_modules link: ${link}\n`)
+  } else {
+    process.stdout.write(`note: ${link} points elsewhere (${target}) — left in place\n`)
+  }
+}
+
 const { profile, cleanSettings, help } = parseArgs(process.argv.slice(2))
 if (help) {
   process.stdout.write(`Usage: node scripts/uninstall.mjs [--profile web] [--clean-settings]\n`)
   process.exit(0)
+}
+if (!/^[a-z0-9-]+$/.test(profile)) {
+  throw new Error(`invalid profile name: ${profile}`)
 }
 
 const manifest = join(dshHome(), 'profiles', profile, 'package.json')
@@ -63,6 +99,7 @@ if (json.dsh?.profile?.bundles?.includes(PACKAGE_NAME)) {
   throw new Error(`bundle layer '${PACKAGE_NAME}' still listed after removal — reconcile failed`)
 }
 process.stdout.write(`OK: '${PACKAGE_NAME}' removed from dsh.profile.bundles; the host ui-conversation row restores on next boot\n`)
+removeLeftoverLink(join(dshHome(), 'profiles', profile))
 
 if (cleanSettings) {
   const settings = join(dshHome(), 'settings.yaml')

@@ -41,6 +41,9 @@ if (help) {
   process.stdout.write(`Usage: node scripts/install.mjs [--profile web] [--plugin-path <dir>]\n`)
   process.exit(0)
 }
+if (!/^[a-z0-9-]+$/.test(profile)) {
+  throw new Error(`invalid profile name: ${profile}`)
+}
 
 const clientBundle = join(pluginPath, 'lib', 'client.js')
 if (!existsSync(clientBundle)) {
