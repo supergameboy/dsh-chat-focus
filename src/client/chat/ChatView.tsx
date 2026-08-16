@@ -199,13 +199,22 @@ function FocusGroupRow({ group, focus, nodeStore, renderSeat, useSession, loadIm
       >
         <RuntimeFoldBox
           anchorKey={group.anchorKey}
-          insideKeys={group.inside}
+          insideItems={group.inside}
           summary={group.summary}
           defaultOpen={group.recent || focus.focusDefaultOpen}
           strategySalt={`${focus.focusStrategy}:${focus.focusKeepVisible}`}
           summaryVisible={focus.focusSummary}
           t={t}
-          renderNode={renderSeat}
+          renderItem={(item, index) => item.kind === 'node'
+            ? renderSeat(item.nodeKey)
+            : (
+              <ReasoningRow
+                key={`think:${item.nodeKey}:${index}`}
+                text={item.text}
+                running={item.running}
+                t={t}
+              />
+            )}
         />
       </div>
     )
@@ -218,12 +227,11 @@ function FocusGroupRow({ group, focus, nodeStore, renderSeat, useSession, loadIm
     )
   }
 
-  // Reply: reasoning blocks render outside the bubble (chat-app style Think
-  // rows); the remaining blocks (text/image/tool-call/other) render inside.
+  // Reply: thinking already folded into the preceding runtime run; the bubble
+  // carries only the remaining blocks (text/image/tool-call/other).
   const node = nodeStore.get(group.nodeKey)
   const data = node?.data as AssistantChatData | undefined
   const blocks = data?.blocks ?? []
-  const reasoningBlocks = blocks.filter(block => block.kind === 'reasoning')
   const bubbleBlocks = blocks.filter(block => block.kind !== 'reasoning')
   const streaming = data?.status === 'running'
   const interrupted = data?.status === 'interrupted'
@@ -248,14 +256,6 @@ function FocusGroupRow({ group, focus, nodeStore, renderSeat, useSession, loadIm
   )
   return (
     <div className={css.flowItem} data-chat-flow-key={group.nodeKey} data-chat-flow-kind={group.kind}>
-      {reasoningBlocks.map((block, index) => (
-        <ReasoningRow
-          key={index}
-          text={block.text}
-          running={streaming && index === reasoningBlocks.length - 1}
-          t={t}
-        />
-      ))}
       {focus.focusBubbles
         ? (
           <ChatBubble

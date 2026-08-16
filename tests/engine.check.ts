@@ -38,12 +38,57 @@ const groups = buildGroups(keys, nodes, settings)
 assert.equal(groups.length, 3, 'user + runtime-run + reply')
 const run = groups.find(g => g.kind === 'runtime-run') as Extract<GroupRow, { kind: 'runtime-run' }>
 assert.ok(run, 'runtime-run exists')
-assert.deepEqual(run.inside, ['t1', 't2', 't3'])
+assert.deepEqual(run.inside, [
+  { kind: 'node', nodeKey: 't1' },
+  { kind: 'node', nodeKey: 't2' },
+  { kind: 'node', nodeKey: 't3' },
+])
 assert.equal(run.recent, true, 'run before the single reply is recent')
 assert.equal(run.summary.total, 3)
 assert.equal(run.summary.toolCount, 2)
 assert.equal(run.summary.thinkCount, 1)
 assert.deepEqual(run.summary.toolNames, ['read', 'glob'])
+
+// 2b. A reply's thinking blocks fold INTO the preceding run (no separate row).
+const thinkKeys = ['u1', 't1', 'r1']
+const thinkNodes = store([
+  ['u1', node('user', {}, 'u1')],
+  ['t1', node('tool-call', { root: { name: 'read' } }, 't1')],
+  ['r1', node('assistant-step', {
+    status: 'settled',
+    blocks: [
+      { kind: 'reasoning', text: 'think-a' },
+      { kind: 'text', text: 'answer' },
+    ],
+  }, 'r1')],
+])
+const thinkGroups = buildGroups(thinkKeys, thinkNodes, settings)
+const thinkRun = thinkGroups.find(g => g.kind === 'runtime-run') as Extract<GroupRow, { kind: 'runtime-run' }>
+assert.deepEqual(thinkRun.inside, [
+  { kind: 'node', nodeKey: 't1' },
+  { kind: 'reasoning', nodeKey: 'r1', text: 'think-a', running: false },
+], 'reply thinking joins the run')
+assert.equal(thinkRun.summary.thinkCount, 1)
+assert.equal(thinkRun.summary.total, 2)
+assert.equal((thinkGroups.find(g => g.kind === 'reply') as Extract<GroupRow, { kind: 'reply' }>).nodeKey, 'r1')
+
+// 2c. Streaming reply marks its last thinking block as running.
+const streamNodes = store([
+  ['t1', node('tool-call', { root: { name: 'read' } }, 't1')],
+  ['r1', node('assistant-step', {
+    status: 'running',
+    blocks: [
+      { kind: 'reasoning', text: 'think-a' },
+      { kind: 'reasoning', text: 'think-b' },
+      { kind: 'text', text: 'partial' },
+    ],
+  }, 'r1')],
+])
+const streamGroups = buildGroups(['t1', 'r1'], streamNodes, settings)
+const streamRun = streamGroups.find(g => g.kind === 'runtime-run') as Extract<GroupRow, { kind: 'runtime-run' }>
+const reasoningItems = streamRun.inside.filter(item => item.kind === 'reasoning')
+assert.equal(reasoningItems[0].running, false)
+assert.equal(reasoningItems[1].running, true, 'last thinking block streams')
 
 // 3. N=0 folds everything (no recent runs).
 const zero = buildGroups(keys, nodes, { ...settings, focusKeepVisible: 0 })

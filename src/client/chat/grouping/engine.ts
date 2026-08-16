@@ -20,16 +20,21 @@ export interface RuntimeSummary {
   readonly toolNames: readonly string[]
 }
 
+/** One entry inside a runtime run: a whole node or a reply's thinking block. */
+export type RunItem =
+  | { readonly kind: 'node'; readonly nodeKey: string }
+  | { readonly kind: 'reasoning'; readonly nodeKey: string; readonly text: string; readonly running: boolean }
+
 /** One rendered row of the focus flow. */
 export type GroupRow =
   | { readonly kind: 'user' | 'reply' | 'other'; readonly nodeKey: string }
   | { readonly kind: 'tail'; readonly nodeKey: string }
   | {
       readonly kind: 'runtime-run'
-      /** Node keys inside the fold box. */
-      readonly inside: readonly string[]
+      /** Entries inside the fold box (nodes plus the reply's thinking blocks). */
+      readonly inside: readonly RunItem[]
       readonly summary: RuntimeSummary
-      /** Stable anchor identity: the first node key of the run. */
+      /** Stable anchor identity: the first entry's node key. */
       readonly anchorKey: string
       /**
        * Whether this run belongs to one of the most recent `focusKeepVisible`
@@ -115,7 +120,7 @@ export interface NodeLookup {
 
 /** One pending run waiting for its following reply during the scan. */
 interface PendingRun {
-  readonly keys: string[]
+  readonly items: readonly RunItem[]
   readonly summary: RuntimeSummary
 }
 
@@ -123,6 +128,22 @@ interface PendingRun {
 type BuiltRow =
   | { readonly kind: 'run'; readonly run: PendingRun; readonly afterReplySeq: number | null }
   | { readonly kind: 'node'; readonly nodeKey: string; readonly klass: 'user' | 'reply' | 'tail' | 'other' }
+
+/** Extract a reply's thinking blocks as run entries (streaming tail marked running). */
+function reasoningItemsOf(node: ChatConversationViewNode): RunItem[] {
+  const data = node.data as { status?: unknown; blocks?: readonly unknown[] } | null
+  if (data === null || typeof data !== 'object' || !Array.isArray(data.blocks)) return []
+  const texts = data.blocks
+    .filter(block => typeof block === 'object' && block !== null && (block as { kind?: unknown }).kind === 'reasoning')
+    .map(block => String((block as { text?: unknown }).text ?? ''))
+  const streaming = data.status === 'running'
+  return texts.map((text, index) => ({
+    kind: 'reasoning' as const,
+    nodeKey: node.key,
+    text,
+    running: streaming && index === texts.length - 1,
+  }))
+}
 
 /**
  * Build the focus row sequence from the ordered node keys.
@@ -173,9 +194,28 @@ export function buildGroups(
     if (node === undefined) continue
     const klass = classifyNode(node, settings)
     if (klass === 'runtime') {
-      if (openRun === null) openRun = { keys: [], summary: EMPTY_SUMMARY }
-      openRun = { keys: [...openRun.keys, key], summary: updateSummary(openRun.summary, node) }
+      if (openRun === null) openRun = { items: [], summary: EMPTY_SUMMARY }
+      openRun = {
+        items: [...openRun.items, { kind: 'node', nodeKey: key }],
+        summary: updateSummary(openRun.summary, node),
+      }
       continue
+    }
+    if (klass === 'reply') {
+      // The reply's thinking blocks fold into the run that precedes it, so
+      // thinking never renders as a separate row outside the fold box.
+      const reasoning = reasoningItemsOf(node)
+      if (reasoning.length > 0) {
+        if (openRun === null) openRun = { items: [], summary: EMPTY_SUMMARY }
+        openRun = {
+          items: [...openRun.items, ...reasoning],
+          summary: {
+            ...openRun.summary,
+            total: openRun.summary.total + reasoning.length,
+            thinkCount: openRun.summary.thinkCount + reasoning.length,
+          },
+        }
+      }
     }
     flushRun(false)
     if (klass === 'reply') replySeq += 1
@@ -194,9 +234,9 @@ export function buildGroups(
       && (row.afterReplySeq === null || row.afterReplySeq > replySeq - settings.focusKeepVisible)
     rows.push({
       kind: 'runtime-run',
-      inside: row.run.keys,
+      inside: row.run.items,
       summary: row.run.summary,
-      anchorKey: row.run.keys[0] ?? '',
+      anchorKey: row.run.items[0]?.nodeKey ?? '',
       recent,
     })
   }

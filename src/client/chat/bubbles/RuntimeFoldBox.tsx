@@ -6,7 +6,7 @@ import { memo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { IconChevronDownOutline14, IconChevronUpOutline14, IconThinkOutline14 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ChatViewSlotProps } from '../../contract/slots.ts'
-import type { RuntimeSummary } from '../grouping/engine.ts'
+import type { RunItem, RuntimeSummary } from '../grouping/engine.ts'
 import { SUMMARY_TOOL_NAME_LIMIT } from '../grouping/engine.ts'
 import css from './RuntimeFoldBox.module.css'
 
@@ -38,8 +38,8 @@ function writeStored(key: string, state: FoldBoxState): void {
 export interface RuntimeFoldBoxProps {
   /** Stable identity of the run (first node key), also the storage key suffix. */
   readonly anchorKey: string
-  /** Node keys inside the box. */
-  readonly insideKeys: readonly string[]
+  /** Entries inside the box (nodes plus thinking blocks). */
+  readonly insideItems: readonly RunItem[]
   readonly summary: RuntimeSummary
   /** Whether the box starts expanded (recent-run strategy or user preference). */
   readonly defaultOpen: boolean
@@ -54,13 +54,13 @@ export interface RuntimeFoldBoxProps {
   readonly summaryVisible: boolean
   /** Locale seat (conversation namespace). */
   readonly t: ChatViewSlotProps['t']
-  /** Render one node key (the caller owns the keyed seat). */
-  readonly renderNode: (nodeKey: string) => ReactNode
+  /** Render one run entry (the caller owns the keyed seat / Think row). */
+  readonly renderItem: (item: RunItem, index: number) => ReactNode
 }
 
 /** Fold box with summary line and per-run persistence. */
 export const RuntimeFoldBox = memo(function RuntimeFoldBox({
-  anchorKey, insideKeys, summary, defaultOpen, strategySalt, summaryVisible, t, renderNode,
+  anchorKey, insideItems, summary, defaultOpen, strategySalt, summaryVisible, t, renderItem,
 }: RuntimeFoldBoxProps) {
   const storageKey = `${FOLD_STATE_PREFIX}${anchorKey}${strategySalt === undefined || strategySalt === '' ? '' : `.${strategySalt}`}`
   // Manual state (user toggle, persisted) is layered over the strategy
@@ -105,8 +105,13 @@ export const RuntimeFoldBox = memo(function RuntimeFoldBox({
       </summary>
       {open && (
         <div className={css.body} data-chat-fold-virtual="">
-          {insideKeys.map(nodeKey => (
-            <div key={nodeKey} className={css.bodyItem}>{renderNode(nodeKey)}</div>
+          {insideItems.map((item, index) => (
+            <div
+              key={item.kind === 'node' ? item.nodeKey : `${item.nodeKey}:think:${index}`}
+              className={css.bodyItem}
+            >
+              {renderItem(item, index)}
+            </div>
           ))}
         </div>
       )}

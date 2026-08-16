@@ -97,10 +97,14 @@ export type ChatFocusSectionProps =
   PropsRuntime<'settings.section'> & InjectFace<ChatFocusSectionInjected> & PropsLocale<'conversation'>
 
 /** Sample runtime run for the appearance preview (root scope has no session seat). */
-const PREVIEW_RUN: Omit<RuntimeFoldBoxProps, 'renderNode' | 't' | 'defaultOpen' | 'summaryVisible' | 'keepVisible'> = {
+const PREVIEW_RUN: Omit<RuntimeFoldBoxProps, 'renderItem' | 't' | 'defaultOpen' | 'summaryVisible' | 'strategySalt'> = {
   anchorKey: 'preview-run',
-  insideKeys: ['preview-1', 'preview-2', 'preview-3'],
-  summary: { total: 5, toolCount: 3, thinkCount: 1, otherCount: 1, toolNames: ['read', 'glob'] },
+  insideItems: [
+    { kind: 'node', nodeKey: 'preview-1' },
+    { kind: 'node', nodeKey: 'preview-2' },
+    { kind: 'reasoning', nodeKey: 'preview-reply', text: '让我先确认需求细节…', running: false },
+  ],
+  summary: { total: 5, toolCount: 2, thinkCount: 2, otherCount: 1, toolNames: ['read', 'glob'] },
 }
 
 /** Sample preview node bodies (frozen, non-interactive). */
@@ -390,9 +394,9 @@ export const ChatFocusSection = memo(function ChatFocusSection({
               defaultOpen={focus.focusDefaultOpen}
               summaryVisible={focus.focusSummary}
               t={t}
-              renderNode={key => (
-                <PreviewNode key={key} label={key === 'preview-1' ? 'read' : key === 'preview-2' ? 'glob' : '思考'} />
-              )}
+              renderItem={item => item.kind === 'reasoning'
+                ? <div className={css.previewThink}>{item.text}</div>
+                : <PreviewNode key={item.nodeKey} label={item.nodeKey === 'preview-1' ? 'read' : 'glob'} />}
             />
             <ChatBubble
               role="assistant"
