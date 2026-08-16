@@ -202,6 +202,7 @@ function FocusGroupRow({ group, focus, nodeStore, renderSeat, useSession, loadIm
           insideKeys={group.inside}
           summary={group.summary}
           defaultOpen={group.recent || focus.focusDefaultOpen}
+          strategySalt={`${focus.focusStrategy}:${focus.focusKeepVisible}`}
           summaryVisible={focus.focusSummary}
           t={t}
           renderNode={renderSeat}
@@ -543,7 +544,7 @@ export function ChatView({
           )}
           {groups.map(group => (
             <FocusGroupRow
-              key={groupKey(group)}
+              key={`${groupKey(group)}:${focus.focusStrategy}:${focus.focusKeepVisible}`}
               group={group}
               focus={focus}
               nodeStore={nodeStore}

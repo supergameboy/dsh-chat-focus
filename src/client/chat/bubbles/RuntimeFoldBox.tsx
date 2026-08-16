@@ -43,6 +43,13 @@ export interface RuntimeFoldBoxProps {
   readonly summary: RuntimeSummary
   /** Whether the box starts expanded (recent-run strategy or user preference). */
   readonly defaultOpen: boolean
+  /**
+   * Strategy signature salted into the storage key (e.g. "keep-recent:1").
+   * Changing the fold strategy or the keep-visible count invalidates stored
+   * manual states, so the new default applies — stale "expanded" entries from
+   * an older configuration cannot fight the current strategy.
+   */
+  readonly strategySalt?: string
   /** Whether the summary line shows counts and tool names. */
   readonly summaryVisible: boolean
   /** Locale seat (conversation namespace). */
@@ -53,17 +60,18 @@ export interface RuntimeFoldBoxProps {
 
 /** Fold box with summary line and per-run persistence. */
 export const RuntimeFoldBox = memo(function RuntimeFoldBox({
-  anchorKey, insideKeys, summary, defaultOpen, summaryVisible, t, renderNode,
+  anchorKey, insideKeys, summary, defaultOpen, strategySalt, summaryVisible, t, renderNode,
 }: RuntimeFoldBoxProps) {
-  const storageKey = `${FOLD_STATE_PREFIX}${anchorKey}`
-  const [open, setOpen] = useState(() => {
-    const stored = readStored(storageKey)
-    return stored !== null ? stored === 'expanded' : defaultOpen
-  })
+  const storageKey = `${FOLD_STATE_PREFIX}${anchorKey}${strategySalt === undefined || strategySalt === '' ? '' : `.${strategySalt}`}`
+  // Manual state (user toggle, persisted) is layered over the strategy
+  // default: null means "follow defaultOpen", which keeps setting changes
+  // live for groups the user never touched.
+  const [manual, setManual] = useState<FoldBoxState | null>(() => readStored(storageKey))
+  const open = manual === null ? defaultOpen : manual === 'expanded'
 
   const toggle = (): void => {
     const next = !open
-    setOpen(next)
+    setManual(next ? 'expanded' : 'collapsed')
     writeStored(storageKey, next ? 'expanded' : 'collapsed')
   }
 
