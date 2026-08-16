@@ -1,0 +1,7 @@
+# dsh-chat-focus 独立仓库：宿主 deepseek-harness（rc.5 基线）作为跨仓库 workspace 成员，
+# 提供 @deepseek-ai/* 依赖（workspace:^ 协议解析）与精确的类型契约。
+# 宿主仓库本身不会被本仓库的 install/build 修改。
+packages:
+  - "."
+  - "../deepseek-harness/packages/*/*"
+  - "../deepseek-harness/vendor/*"

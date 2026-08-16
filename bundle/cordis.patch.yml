@@ -1,0 +1,9 @@
+# dsh-chat-focus bundle patch: replace the host ui-conversation row with the
+# fork (same slot contract, extended settings schema). Layers above may still
+# patch either row by id; removing this bundle from the profile restores the
+# host row automatically.
+- id: ui-conversation
+  disabled: true
+- insert:
+    - id: chat-focus
+      name: 'dsh-chat-focus'

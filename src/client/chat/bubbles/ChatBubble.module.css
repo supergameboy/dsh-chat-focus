@@ -1,0 +1,76 @@
+/* ChatBubble: left/right chat-bubble chrome. Colors map to host dsw alias
+   tokens only (deep-mode follows automatically); the compact variant lowers
+   density. */
+
+.bubble {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  max-width: 720px;
+}
+
+.assistant {
+  align-items: flex-start;
+}
+
+.user {
+  align-items: flex-end;
+  margin-left: auto;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 4px;
+}
+
+.roleIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  color: var(--dsw-alias-label-secondary);
+  background: var(--dsw-alias-bg-layer-2);
+}
+
+.clock {
+  font: var(--dsw-font-xs-13);
+  color: var(--dsw-alias-label-caption);
+  font-variant-numeric: tabular-nums;
+}
+
+.content {
+  min-width: 0;
+  border-radius: 12px;
+  padding: 10px 14px;
+  overflow-wrap: anywhere;
+}
+
+.assistant .content {
+  border: 1px solid var(--dsw-alias-border-l1);
+  background: var(--dsw-alias-bg-layer-2);
+  border-top-left-radius: 4px;
+}
+
+.user .content {
+  border: 1px solid color-mix(in oklab, var(--dsw-alias-brand-primary) 30%, transparent);
+  background: color-mix(in oklab, var(--dsw-alias-brand-primary) 12%, transparent);
+  border-top-right-radius: 4px;
+}
+
+.compact .content {
+  border-radius: 10px;
+  padding: 6px 10px;
+}
+
+.compact.assistant .content {
+  border-top-left-radius: 3px;
+}
+
+.compact.user .content {
+  border-top-right-radius: 3px;
+}
