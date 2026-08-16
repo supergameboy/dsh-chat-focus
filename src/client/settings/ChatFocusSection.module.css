@@ -141,6 +141,39 @@
   margin-top: 6px;
 }
 
+.sideBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 0 4px;
+  border-top: 1px dashed var(--dsw-alias-border-l2);
+  margin-top: 6px;
+}
+
+.sideTitle {
+  font: var(--dsw-font-s-strong-14);
+  color: var(--dsw-alias-label-primary);
+  padding-bottom: 4px;
+}
+
+.gradientBox {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+}
+
+.gradientRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.gradientAngle {
+  font: var(--dsw-font-xs-13);
+  color: var(--dsw-alias-label-secondary);
+}
+
 .customTitle {
   font: var(--dsw-font-s-strong-14);
   color: var(--dsw-alias-label-primary);

@@ -6,7 +6,9 @@
 .root {
   display: flex;
   flex-direction: column;
-  font-size: 16px;
+  /* The bubble's --cf-bubble-font-size override reaches the markdown body
+     (font-size is not inherited, so the bubble sets this variable on .root). */
+  font-size: var(--cf-bubble-font-size, 16px);
   line-height: 28px;
   color: var(--dsw-alias-label-primary);
 }

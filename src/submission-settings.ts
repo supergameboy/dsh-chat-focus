@@ -72,6 +72,34 @@ export const FOCUS_BUBBLE_PADDING_FIELD = 'focusBubblePadding'
 export const FOCUS_USER_BUBBLE_TEXT_COLOR_FIELD = 'focusUserBubbleTextColor'
 /** Custom user-bubble font family (CSS value; empty = theme default). */
 export const FOCUS_USER_BUBBLE_FONT_FIELD = 'focusUserBubbleFont'
+/** Assistant-bubble gradient start color (CSS color; empty = no gradient). */
+export const FOCUS_BUBBLE_GRADIENT_FROM_FIELD = 'focusBubbleGradientFrom'
+/** Assistant-bubble gradient end color (CSS color). */
+export const FOCUS_BUBBLE_GRADIENT_TO_FIELD = 'focusBubbleGradientTo'
+/** Assistant-bubble gradient angle in degrees (string number). */
+export const FOCUS_BUBBLE_GRADIENT_ANGLE_FIELD = 'focusBubbleGradientAngle'
+/** Custom user-bubble border color (CSS color; empty = none). */
+export const FOCUS_USER_BUBBLE_BORDER_FIELD = 'focusUserBubbleBorder'
+/** Custom user-bubble corner radius (CSS length; empty = theme default 22px). */
+export const FOCUS_USER_BUBBLE_RADIUS_FIELD = 'focusUserBubbleRadius'
+/** Custom user-bubble max width (CSS length; empty = theme default). */
+export const FOCUS_USER_BUBBLE_MAX_WIDTH_FIELD = 'focusUserBubbleMaxWidth'
+/** Custom user-bubble background image (URL or data URI; empty = none). */
+export const FOCUS_USER_BUBBLE_BG_IMAGE_FIELD = 'focusUserBubbleBgImage'
+/** User-bubble background-image fit mode. */
+export const FOCUS_USER_BUBBLE_BG_SIZE_FIELD = 'focusUserBubbleBgSize'
+/** Custom user-bubble font size (CSS length; empty = theme default). */
+export const FOCUS_USER_BUBBLE_FONT_SIZE_FIELD = 'focusUserBubbleFontSize'
+/** Custom user-bubble padding (CSS shorthand; empty = theme default). */
+export const FOCUS_USER_BUBBLE_PADDING_FIELD = 'focusUserBubblePadding'
+/** User-bubble gradient start color (CSS color; empty = no gradient). */
+export const FOCUS_USER_BUBBLE_GRADIENT_FROM_FIELD = 'focusUserBubbleGradientFrom'
+/** User-bubble gradient end color (CSS color). */
+export const FOCUS_USER_BUBBLE_GRADIENT_TO_FIELD = 'focusUserBubbleGradientTo'
+/** User-bubble gradient angle in degrees (string number). */
+export const FOCUS_USER_BUBBLE_GRADIENT_ANGLE_FIELD = 'focusUserBubbleGradientAngle'
+/** User-bubble template id ('' = none/custom). */
+export const FOCUS_USER_BUBBLE_PRESET_FIELD = 'focusUserBubblePreset'
 
 /** Defaults shared by the schema, the client scope, and the grouping engine. */
 export const DEFAULT_FOCUS_ENABLED = true
@@ -96,6 +124,20 @@ export const DEFAULT_FOCUS_BUBBLE_FONT_SIZE = ''
 export const DEFAULT_FOCUS_BUBBLE_PADDING = ''
 export const DEFAULT_FOCUS_USER_BUBBLE_TEXT_COLOR = ''
 export const DEFAULT_FOCUS_USER_BUBBLE_FONT = ''
+export const DEFAULT_FOCUS_BUBBLE_GRADIENT_FROM = ''
+export const DEFAULT_FOCUS_BUBBLE_GRADIENT_TO = ''
+export const DEFAULT_FOCUS_BUBBLE_GRADIENT_ANGLE = '135'
+export const DEFAULT_FOCUS_USER_BUBBLE_BORDER = ''
+export const DEFAULT_FOCUS_USER_BUBBLE_RADIUS = ''
+export const DEFAULT_FOCUS_USER_BUBBLE_MAX_WIDTH = ''
+export const DEFAULT_FOCUS_USER_BUBBLE_BG_IMAGE = ''
+export const DEFAULT_FOCUS_USER_BUBBLE_BG_SIZE: FocusBubbleBgSize = 'cover'
+export const DEFAULT_FOCUS_USER_BUBBLE_FONT_SIZE = ''
+export const DEFAULT_FOCUS_USER_BUBBLE_PADDING = ''
+export const DEFAULT_FOCUS_USER_BUBBLE_GRADIENT_FROM = ''
+export const DEFAULT_FOCUS_USER_BUBBLE_GRADIENT_TO = ''
+export const DEFAULT_FOCUS_USER_BUBBLE_GRADIENT_ANGLE = '135'
+export const DEFAULT_FOCUS_USER_BUBBLE_PRESET = ''
 
 /** Static defaults the client uses while the namespace is loading or unavailable. */
 export const DEFAULT_CONVERSATION_SETTINGS: ConversationSettings = {
@@ -122,6 +164,20 @@ export const DEFAULT_CONVERSATION_SETTINGS: ConversationSettings = {
   focusBubblePadding: DEFAULT_FOCUS_BUBBLE_PADDING,
   focusUserBubbleTextColor: DEFAULT_FOCUS_USER_BUBBLE_TEXT_COLOR,
   focusUserBubbleFont: DEFAULT_FOCUS_USER_BUBBLE_FONT,
+  focusBubbleGradientFrom: DEFAULT_FOCUS_BUBBLE_GRADIENT_FROM,
+  focusBubbleGradientTo: DEFAULT_FOCUS_BUBBLE_GRADIENT_TO,
+  focusBubbleGradientAngle: DEFAULT_FOCUS_BUBBLE_GRADIENT_ANGLE,
+  focusUserBubbleBorder: DEFAULT_FOCUS_USER_BUBBLE_BORDER,
+  focusUserBubbleRadius: DEFAULT_FOCUS_USER_BUBBLE_RADIUS,
+  focusUserBubbleMaxWidth: DEFAULT_FOCUS_USER_BUBBLE_MAX_WIDTH,
+  focusUserBubbleBgImage: DEFAULT_FOCUS_USER_BUBBLE_BG_IMAGE,
+  focusUserBubbleBgSize: DEFAULT_FOCUS_USER_BUBBLE_BG_SIZE,
+  focusUserBubbleFontSize: DEFAULT_FOCUS_USER_BUBBLE_FONT_SIZE,
+  focusUserBubblePadding: DEFAULT_FOCUS_USER_BUBBLE_PADDING,
+  focusUserBubbleGradientFrom: DEFAULT_FOCUS_USER_BUBBLE_GRADIENT_FROM,
+  focusUserBubbleGradientTo: DEFAULT_FOCUS_USER_BUBBLE_GRADIENT_TO,
+  focusUserBubbleGradientAngle: DEFAULT_FOCUS_USER_BUBBLE_GRADIENT_ANGLE,
+  focusUserBubblePreset: DEFAULT_FOCUS_USER_BUBBLE_PRESET,
 }
 
 /** Durable ChatFocus display section. */
@@ -170,6 +226,34 @@ export interface ChatFocusSettings {
   focusUserBubbleTextColor: string
   /** Custom user-bubble font family (empty = theme default). */
   focusUserBubbleFont: string
+  /** Assistant-bubble gradient start color (empty = no gradient). */
+  focusBubbleGradientFrom: string
+  /** Assistant-bubble gradient end color. */
+  focusBubbleGradientTo: string
+  /** Assistant-bubble gradient angle in degrees. */
+  focusBubbleGradientAngle: string
+  /** Custom user-bubble border color (empty = none). */
+  focusUserBubbleBorder: string
+  /** Custom user-bubble corner radius (empty = theme default 22px). */
+  focusUserBubbleRadius: string
+  /** Custom user-bubble max width (empty = theme default). */
+  focusUserBubbleMaxWidth: string
+  /** Custom user-bubble background image (empty = none). */
+  focusUserBubbleBgImage: string
+  /** User-bubble background-image fit mode. */
+  focusUserBubbleBgSize: FocusBubbleBgSize
+  /** Custom user-bubble font size (empty = theme default). */
+  focusUserBubbleFontSize: string
+  /** Custom user-bubble padding (empty = theme default). */
+  focusUserBubblePadding: string
+  /** User-bubble gradient start color (empty = no gradient). */
+  focusUserBubbleGradientFrom: string
+  /** User-bubble gradient end color. */
+  focusUserBubbleGradientTo: string
+  /** User-bubble gradient angle in degrees. */
+  focusUserBubbleGradientAngle: string
+  /** User-bubble template id (empty = none/custom). */
+  focusUserBubblePreset: string
 }
 
 /** Durable conversation section shared by the Host schema and the browser scope. */
@@ -203,4 +287,18 @@ export const ConversationSettingsSchema: z<ConversationSettings> = z.object({
   [FOCUS_BUBBLE_PADDING_FIELD]: z.string().default(DEFAULT_FOCUS_BUBBLE_PADDING),
   [FOCUS_USER_BUBBLE_TEXT_COLOR_FIELD]: z.string().default(DEFAULT_FOCUS_USER_BUBBLE_TEXT_COLOR),
   [FOCUS_USER_BUBBLE_FONT_FIELD]: z.string().default(DEFAULT_FOCUS_USER_BUBBLE_FONT),
+  [FOCUS_BUBBLE_GRADIENT_FROM_FIELD]: z.string().default(DEFAULT_FOCUS_BUBBLE_GRADIENT_FROM),
+  [FOCUS_BUBBLE_GRADIENT_TO_FIELD]: z.string().default(DEFAULT_FOCUS_BUBBLE_GRADIENT_TO),
+  [FOCUS_BUBBLE_GRADIENT_ANGLE_FIELD]: z.string().default(DEFAULT_FOCUS_BUBBLE_GRADIENT_ANGLE),
+  [FOCUS_USER_BUBBLE_BORDER_FIELD]: z.string().default(DEFAULT_FOCUS_USER_BUBBLE_BORDER),
+  [FOCUS_USER_BUBBLE_RADIUS_FIELD]: z.string().default(DEFAULT_FOCUS_USER_BUBBLE_RADIUS),
+  [FOCUS_USER_BUBBLE_MAX_WIDTH_FIELD]: z.string().default(DEFAULT_FOCUS_USER_BUBBLE_MAX_WIDTH),
+  [FOCUS_USER_BUBBLE_BG_IMAGE_FIELD]: z.string().default(DEFAULT_FOCUS_USER_BUBBLE_BG_IMAGE),
+  [FOCUS_USER_BUBBLE_BG_SIZE_FIELD]: z.union([...FOCUS_BUBBLE_BG_SIZES]).default(DEFAULT_FOCUS_USER_BUBBLE_BG_SIZE),
+  [FOCUS_USER_BUBBLE_FONT_SIZE_FIELD]: z.string().default(DEFAULT_FOCUS_USER_BUBBLE_FONT_SIZE),
+  [FOCUS_USER_BUBBLE_PADDING_FIELD]: z.string().default(DEFAULT_FOCUS_USER_BUBBLE_PADDING),
+  [FOCUS_USER_BUBBLE_GRADIENT_FROM_FIELD]: z.string().default(DEFAULT_FOCUS_USER_BUBBLE_GRADIENT_FROM),
+  [FOCUS_USER_BUBBLE_GRADIENT_TO_FIELD]: z.string().default(DEFAULT_FOCUS_USER_BUBBLE_GRADIENT_TO),
+  [FOCUS_USER_BUBBLE_GRADIENT_ANGLE_FIELD]: z.string().default(DEFAULT_FOCUS_USER_BUBBLE_GRADIENT_ANGLE),
+  [FOCUS_USER_BUBBLE_PRESET_FIELD]: z.string().default(DEFAULT_FOCUS_USER_BUBBLE_PRESET),
 })

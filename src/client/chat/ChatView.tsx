@@ -24,7 +24,9 @@ import type { ChatConversationViewNode } from '@deepseek-ai/dsh-client-runtime/c
 import { IconChevronDownOutline14 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ChatViewSlotProps } from '../contract/slots.ts'
 import type { ConversationSettings } from '../../submission-settings.ts'
+import type { FocusBubbleBgSize } from '../../submission-settings.ts'
 import type { AssistantChatData } from '../contract/chat-nodes.ts'
+import type { ChatBubbleCustomStyle } from './bubbles/ChatBubble.tsx'
 import { PendingSteeringBubble } from './MessageItem.tsx'
 import { ChatNodeSeat } from './ChatNodeSeat.tsx'
 import { AssistantMarkdown } from './AssistantMarkdown.tsx'
@@ -44,6 +46,63 @@ function nodeTime(node: ChatConversationViewNode | undefined): number | undefine
   if (typeof data.time === 'number') return data.time
   if (typeof data.finalNode?.time === 'number') return data.finalNode.time
   return undefined
+}
+
+/** One side's bubble chrome fields (assistant or user). */
+interface BubbleSideFields {
+  bg: string
+  border: string
+  radius: string
+  maxWidth: string
+  bgImage: string
+  bgSize: FocusBubbleBgSize
+  gradientFrom: string
+  gradientTo: string
+  gradientAngle: string
+  textColor: string
+  font: string
+  fontSize: string
+  padding: string
+}
+
+/** Build the custom-style object for one bubble side; a gradient overrides the
+ *  background image (GUI-edited fields, no hand-written CSS needed). */
+function bubbleCustom(side: BubbleSideFields): ChatBubbleCustomStyle {
+  const gradient = side.gradientFrom !== ''
+  return {
+    bg: gradient ? 'transparent' : side.bg,
+    border: side.border,
+    radius: side.radius,
+    maxWidth: side.maxWidth,
+    bgImage: gradient
+      ? `linear-gradient(${side.gradientAngle}deg, ${side.gradientFrom}, ${side.gradientTo !== '' ? side.gradientTo : side.gradientFrom})`
+      : side.bgImage,
+    bgSize: side.bgSize,
+    textColor: side.textColor,
+    font: side.font,
+    fontSize: side.fontSize,
+    padding: side.padding,
+  }
+}
+
+/** All --cf-user-* CSS variables for the host user bubble, from one side's fields. */
+function userBubbleVars(side: BubbleSideFields): Record<string, string> {
+  const custom = bubbleCustom(side)
+  const vars: Record<string, string> = {}
+  const set = (name: string, value: string | undefined): void => {
+    if (value !== undefined && value !== '') vars[name] = value
+  }
+  set('--cf-user-bubble-bg', custom.bg)
+  set('--cf-user-bubble-border', custom.border)
+  set('--cf-user-bubble-radius', custom.radius)
+  set('--cf-user-bubble-max-width', custom.maxWidth)
+  set('--cf-user-bubble-bg-image', custom.bgImage)
+  set('--cf-user-bubble-bg-size', custom.bgSize === 'stretch' ? '100% 100%' : custom.bgSize)
+  set('--cf-user-bubble-text-color', custom.textColor)
+  set('--cf-user-bubble-font', custom.font)
+  set('--cf-user-bubble-font-size', custom.fontSize)
+  set('--cf-user-bubble-padding', custom.padding)
+  return vars
 }
 
 /** Active column host when present; otherwise the view-local scroller. */
@@ -227,13 +286,24 @@ function FocusGroupRow({ group, focus, nodeStore, renderSeat, useSession, loadIm
     )
   }
   if (group.kind === 'user') {
-    // The host user row renders its own bubble whose background reads
-    // --dsw-specific-bubble; overriding that variable (plus the inherited
-    // color/font) on this container customizes the user bubble.
-    const userStyle: Record<string, string> = {}
-    if (focus.focusUserBubbleBg !== '') userStyle['--dsw-specific-bubble'] = focus.focusUserBubbleBg
-    if (focus.focusUserBubbleTextColor !== '') userStyle.color = focus.focusUserBubbleTextColor
-    if (focus.focusUserBubbleFont !== '') userStyle.fontFamily = focus.focusUserBubbleFont
+    // The host user row reads --cf-user-* variables for its bubble chrome;
+    // set them on this container so user bubbles share the full
+    // customization surface with assistant bubbles.
+    const userStyle = userBubbleVars({
+      bg: focus.focusUserBubbleBg,
+      border: focus.focusUserBubbleBorder,
+      radius: focus.focusUserBubbleRadius,
+      maxWidth: focus.focusUserBubbleMaxWidth,
+      bgImage: focus.focusUserBubbleBgImage,
+      bgSize: focus.focusUserBubbleBgSize,
+      gradientFrom: focus.focusUserBubbleGradientFrom,
+      gradientTo: focus.focusUserBubbleGradientTo,
+      gradientAngle: focus.focusUserBubbleGradientAngle,
+      textColor: focus.focusUserBubbleTextColor,
+      font: focus.focusUserBubbleFont,
+      fontSize: focus.focusUserBubbleFontSize,
+      padding: focus.focusUserBubblePadding,
+    })
     return (
       <div
         className={css.flowItem}
@@ -281,18 +351,21 @@ function FocusGroupRow({ group, focus, nodeStore, renderSeat, useSession, loadIm
             role="assistant"
             compact={focus.focusBubbleStyle === 'compact'}
             {...(time !== undefined ? { time } : {})}
-            custom={{
+            custom={bubbleCustom({
               bg: focus.focusBubbleBg,
               border: focus.focusBubbleBorder,
               radius: focus.focusBubbleRadius,
               maxWidth: focus.focusBubbleMaxWidth,
               bgImage: focus.focusBubbleBgImage,
               bgSize: focus.focusBubbleBgSize,
+              gradientFrom: focus.focusBubbleGradientFrom,
+              gradientTo: focus.focusBubbleGradientTo,
+              gradientAngle: focus.focusBubbleGradientAngle,
               textColor: focus.focusBubbleTextColor,
               font: focus.focusBubbleFont,
               fontSize: focus.focusBubbleFontSize,
               padding: focus.focusBubblePadding,
-            }}
+            })}
           >
             {markdown}
           </ChatBubble>

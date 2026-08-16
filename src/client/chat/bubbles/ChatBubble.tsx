@@ -79,7 +79,12 @@ export const ChatBubble = memo(function ChatBubble({
     if (custom.bgSize !== undefined) {
       customVars['--cf-bubble-bg-size'] = custom.bgSize === 'stretch' ? '100% 100%' : custom.bgSize
     }
-    if (custom.textColor !== undefined && custom.textColor !== '') customVars['--cf-bubble-text-color'] = custom.textColor
+    if (custom.textColor !== undefined && custom.textColor !== '') {
+      customVars['--cf-bubble-text-color'] = custom.textColor
+      // The markdown body colors itself with the host label token; overriding
+      // the token on this container propagates the custom color inside.
+      customVars['--dsw-alias-label-primary'] = custom.textColor
+    }
     if (custom.font !== undefined && custom.font !== '') customVars['--cf-bubble-font'] = custom.font
     if (custom.fontSize !== undefined && custom.fontSize !== '') customVars['--cf-bubble-font-size'] = custom.fontSize
     if (custom.padding !== undefined && custom.padding !== '') customVars['--cf-bubble-padding'] = custom.padding

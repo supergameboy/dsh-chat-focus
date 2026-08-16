@@ -4,6 +4,7 @@
 // root-scoped, so real session data needs a v0.2 inject channel).
 
 import { memo, useRef, useState } from 'react'
+import type { CSSProperties } from 'react'
 import type { ObservableSnapshot } from '@deepseek-ai/dsh-client-runtime/client'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import { Modal } from '@deepseek-ai/dsh-client-ui-primitives'
@@ -54,15 +55,44 @@ const BUBBLE_PRESETS: readonly BubblePreset[] = [
   { id: 'texture', values: { bg: 'transparent', bgImage: TEXTURE_DATA_URI, border: '#e5e7eb', radius: '12px' } },
 ]
 
-/** Which preset the current custom fields match, or '__custom__'. */
-function activePreset(focus: ConversationSettings): string {
-  const match = BUBBLE_PRESETS.find(preset =>
-    preset.values.bg === focus.focusBubbleBg
-    && (preset.values.border ?? '') === focus.focusBubbleBorder
-    && (preset.values.radius ?? '') === focus.focusBubbleRadius
-    && (preset.values.maxWidth ?? '') === focus.focusBubbleMaxWidth
-    && (preset.values.bgImage ?? '') === focus.focusBubbleBgImage)
-  return match?.id ?? '__custom__'
+/** Preview custom style for one side (gradient overrides the background image). */
+function previewCustom(focus: ConversationSettings, side: 'assistant' | 'user'): ChatBubbleCustomStyle {
+  const f = (suffix: string): string => focus[`${side === 'assistant' ? 'focusBubble' : 'focusUserBubble'}${suffix}` as keyof ConversationSettings] as string
+  const gradient = f('GradientFrom') !== ''
+  return {
+    bg: gradient ? 'transparent' : f('Bg'),
+    border: f('Border'),
+    radius: f('Radius'),
+    maxWidth: f('MaxWidth'),
+    bgImage: gradient
+      ? `linear-gradient(${f('GradientAngle')}deg, ${f('GradientFrom')}, ${f('GradientTo') !== '' ? f('GradientTo') : f('GradientFrom')})`
+      : f('BgImage'),
+    bgSize: focus[`${side === 'assistant' ? 'focusBubble' : 'focusUserBubble'}BgSize` as keyof ConversationSettings] as FocusBubbleBgSize,
+    textColor: f('TextColor'),
+    font: f('Font'),
+    fontSize: f('FontSize'),
+    padding: f('Padding'),
+  }
+}
+
+/** Preview style for the simulated user bubble (mirrors the host chrome). */
+function previewUserStyle(focus: ConversationSettings): CSSProperties {
+  const custom = previewCustom(focus, 'user')
+  const style: Record<string, string> = {}
+  const set = (name: string, value: string | undefined): void => {
+    if (value !== undefined && value !== '') style[name] = value
+  }
+  set('background', custom.bg)
+  set('border', custom.border !== '' ? `1px solid ${custom.border}` : '')
+  set('borderRadius', custom.radius)
+  set('maxWidth', custom.maxWidth)
+  set('backgroundImage', custom.bgImage)
+  set('backgroundSize', custom.bgSize === 'stretch' ? '100% 100%' : custom.bgSize)
+  set('color', custom.textColor)
+  set('fontFamily', custom.font)
+  set('fontSize', custom.fontSize)
+  set('padding', custom.padding)
+  return style as CSSProperties
 }
 
 /** Hex color input plus free-form text input for one color field. */
@@ -153,14 +183,122 @@ function Checkbox({ checked, onChange, label }: {
   )
 }
 
-/** The ChatFocus display settings page. */
-export const ChatFocusSection = memo(function ChatFocusSection({
-  close, useFocusSettings, setFocusField, t,
-}: ChatFocusSectionProps) {
-  const focus = useFocusSettings(value => value)
-  const setField = (field: keyof ConversationSettings, value: unknown): void => {
-    setFocusField(field, value)
-  }
+/** Available font presets (system stacks; '' follows the theme). */
+const FONT_PRESETS: readonly { id: string; value: string }[] = [
+  { id: 'default', value: '' },
+  { id: 'pingfang', value: "'PingFang SC', 'Microsoft YaHei', sans-serif" },
+  { id: 'yahei', value: "'Microsoft YaHei', 'PingFang SC', sans-serif" },
+  { id: 'noto', value: "'Noto Sans SC', 'PingFang SC', sans-serif" },
+  { id: 'helvetica', value: "'Helvetica Neue', Arial, sans-serif" },
+  { id: 'serif', value: "Georgia, 'Times New Roman', serif" },
+  { id: 'mono', value: "Consolas, 'Courier New', monospace" },
+]
+
+/** Font size presets. */
+const FONT_SIZE_PRESETS = ['', '12px', '13px', '14px', '15px', '16px', '18px']
+/** Padding presets. */
+const PADDING_PRESETS = ['', '6px 10px', '10px 14px', '14px 18px']
+
+/** Preset dropdown that falls back to a custom option for free-form values. */
+function PresetSelect({ presets, value, emptyKey, customKey, onChange, t }: {
+  presets: readonly string[]
+  value: string
+  emptyKey: string
+  customKey: string
+  onChange: (next: string) => void
+  t: (key: ConversationKey) => string
+}) {
+  const matched = presets.includes(value)
+  return (
+    <select
+      className={css.select}
+      value={matched ? value : '__custom__'}
+      onChange={event => {
+        const next = event.target.value
+        if (next !== '__custom__') onChange(next)
+      }}
+    >
+      {presets.map(preset => (
+        <option key={preset || 'default'} value={preset}>
+          {preset === '' ? t(emptyKey as ConversationKey) : preset}
+        </option>
+      ))}
+      {!matched && value !== '' && <option value="__custom__">{t(customKey as ConversationKey)}</option>}
+    </select>
+  )
+}
+
+/** Font family dropdown over the system-stack presets. */
+function FontSelect({ value, onChange, t }: {
+  value: string
+  onChange: (next: string) => void
+  t: (key: ConversationKey) => string
+}) {
+  const matched = FONT_PRESETS.find(preset => preset.value === value)
+  return (
+    <select
+      className={css.select}
+      value={matched !== undefined ? matched.id : '__custom__'}
+      onChange={event => {
+        const preset = FONT_PRESETS.find(candidate => candidate.id === event.target.value)
+        if (preset !== undefined) onChange(preset.value)
+      }}
+    >
+      {FONT_PRESETS.map(preset => (
+        <option key={preset.id} value={preset.id}>{t(`focus.font.${preset.id}` as ConversationKey)}</option>
+      ))}
+      {matched === undefined && value !== '' && <option value="__custom__">{t('focus.font.custom')}</option>}
+    </select>
+  )
+}
+
+/** Gradient editor: enable + start/end colors (color wheels) + angle. */
+function GradientEditor({ from, to, angle, onChangeFrom, onChangeTo, onChangeAngle, t }: {
+  from: string
+  to: string
+  angle: string
+  onChangeFrom: (next: string) => void
+  onChangeTo: (next: string) => void
+  onChangeAngle: (next: string) => void
+  t: (key: ConversationKey) => string
+}) {
+  const enabled = from !== ''
+  return (
+    <div className={css.gradientBox}>
+      <label className={css.checkbox}>
+        <input
+          type="checkbox"
+          checked={enabled}
+          onChange={event => onChangeFrom(event.target.checked ? '#eef2ff' : '')}
+        />
+        <span>{t('focus.gradientEnable')}</span>
+      </label>
+      {enabled && (
+        <div className={css.gradientRow}>
+          <ColorField value={from} onChange={onChangeFrom} />
+          <ColorField value={to !== '' ? to : from} onChange={onChangeTo} />
+          <input
+            type="number"
+            className={css.number}
+            min={0}
+            max={360}
+            step={15}
+            value={angle}
+            onChange={event => onChangeAngle(String(Number(event.target.value) || 0))}
+          />
+          <span className={css.gradientAngle}>°</span>
+        </div>
+      )}
+    </div>
+  )
+}
+
+/** Background image field: upload + crop dialog, thumbnail, URL input, clear. */
+function BgImageField({ value, onChange, t }: {
+  value: string
+  onChange: (next: string) => void
+  t: (key: ConversationKey) => string
+}) {
   const fileRef = useRef<HTMLInputElement>(null)
   const [cropSource, setCropSource] = useState<string | null>(null)
   const [uploadError, setUploadError] = useState<string | null>(null)
@@ -179,6 +317,242 @@ export const ChatFocusSection = memo(function ChatFocusSection({
       if (typeof reader.result === 'string') setCropSource(reader.result)
     }
     reader.readAsDataURL(file)
+  }
+
+  return (
+    <>
+      <div className={css.bgImageControl}>
+        <input ref={fileRef} type="file" accept="image/*" hidden onChange={onFilePicked} />
+        <button type="button" className={css.uploadButton} onClick={() => fileRef.current?.click()}>
+          {t('focus.upload')}
+        </button>
+        {value !== '' && <img className={css.bgThumb} src={value} alt="" />}
+        <input
+          type="text"
+          className={css.textInput}
+          placeholder="https://… 或 data:image/…"
+          value={value}
+          onChange={event => onChange(event.target.value)}
+        />
+        {value !== '' && (
+          <button type="button" className={css.clearButton} onClick={() => onChange('')}>
+            {t('focus.clearImage')}
+          </button>
+        )}
+      </div>
+      {uploadError !== null && <span className={css.uploadError} role="status">{uploadError}</span>}
+      <Modal
+        open={cropSource !== null}
+        onClose={() => setCropSource(null)}
+        title={t('focus.cropTitle')}
+        closeLabel={t('details.close')}
+      >
+        {cropSource !== null && (
+          <ImageCropper
+            imageUrl={cropSource}
+            onConfirm={dataUrl => {
+              onChange(dataUrl)
+              setCropSource(null)
+            }}
+            onCancel={() => setCropSource(null)}
+          />
+        )}
+      </Modal>
+    </>
+  )
+}
+
+/** Full per-side bubble editor (assistant or user) with the shared knobs. */
+function BubbleSideEditor({ side, focus, setField, t }: {
+  side: 'assistant' | 'user'
+  focus: ConversationSettings
+  setField: (field: keyof ConversationSettings, value: unknown) => void
+  t: (key: ConversationKey) => string
+}) {
+  const prefix = side === 'assistant' ? 'focusBubble' : 'focusUserBubble'
+  const field = (suffix: string): keyof ConversationSettings => `${prefix}${suffix}` as keyof ConversationSettings
+  const value = (suffix: string): string => focus[field(suffix)] as string
+  const set = (suffix: string, next: unknown): void => setField(field(suffix), next)
+
+  return (
+    <div className={css.sideBlock}>
+      <span className={css.sideTitle}>
+        {t(side === 'assistant' ? 'focus.sideAssistant' : 'focus.sideUser')}
+      </span>
+      <Row
+        title={t('focus.preset')}
+        hint={t('focus.presetHint')}
+        control={(
+          <select
+            className={css.select}
+            value={value('Preset')}
+            onChange={event => {
+              const id = event.target.value
+              const preset = BUBBLE_PRESETS.find(candidate => candidate.id === id)
+              if (preset === undefined) return
+              set('Preset', id)
+              set('Bg', preset.values.bg ?? '')
+              set('Border', preset.values.border ?? '')
+              set('Radius', preset.values.radius ?? '')
+              set('MaxWidth', preset.values.maxWidth ?? '')
+              set('BgImage', preset.values.bgImage ?? '')
+              // Presets that carry a background image disable the gradient.
+              if (preset.values.bgImage !== undefined && preset.values.bgImage !== '') set('GradientFrom', '')
+            }}
+          >
+            {BUBBLE_PRESETS.map(preset => (
+              <option key={preset.id || 'default'} value={preset.id}>
+                {t((preset.id === '' ? 'focus.preset.default' : `focus.preset.${preset.id}`) as ConversationKey)}
+              </option>
+            ))}
+            <option value="__custom__">{t('focus.preset.custom')}</option>
+          </select>
+        )}
+      />
+      <Row
+        title={t('focus.gradient')}
+        hint={t('focus.gradientHint')}
+        control={(
+          <GradientEditor
+            from={value('GradientFrom')}
+            to={value('GradientTo')}
+            angle={value('GradientAngle')}
+            onChangeFrom={next => set('GradientFrom', next)}
+            onChangeTo={next => set('GradientTo', next)}
+            onChangeAngle={next => set('GradientAngle', next)}
+            t={t}
+          />
+        )}
+      />
+      <Row
+        title={t('focus.customBg')}
+        hint={t('focus.customHint')}
+        control={<ColorField value={value('Bg')} onChange={next => set('Bg', next)} />}
+      />
+      <Row
+        title={t('focus.customBorder')}
+        hint={t('focus.customHint')}
+        control={<ColorField value={value('Border')} onChange={next => set('Border', next)} />}
+      />
+      <Row
+        title={t('focus.customRadius')}
+        hint={t('focus.customHint')}
+        control={(
+          <PresetSelect
+            presets={['', '10px', '14px', '18px', '22px']}
+            value={value('Radius')}
+            emptyKey="focus.radiusDefault"
+            customKey="focus.customValue"
+            onChange={next => set('Radius', next)}
+            t={t}
+          />
+        )}
+      />
+      <Row
+        title={t('focus.customMaxWidth')}
+        hint={t('focus.customHint')}
+        control={(
+          <PresetSelect
+            presets={['', '480px', '600px', '720px', '840px']}
+            value={value('MaxWidth')}
+            emptyKey="focus.widthDefault"
+            customKey="focus.customValue"
+            onChange={next => set('MaxWidth', next)}
+            t={t}
+          />
+        )}
+      />
+      <Row
+        title={t('focus.customBgImage')}
+        hint={t('focus.customBgImageHint')}
+        control={<BgImageField value={value('BgImage')} onChange={next => set('BgImage', next)} t={t} />}
+      />
+      <Row
+        title={t('focus.bgSize')}
+        hint={t('focus.bgSizeHint')}
+        control={(
+          <select
+            className={css.select}
+            value={value('BgSize')}
+            onChange={event => set('BgSize', event.target.value as FocusBubbleBgSize)}
+          >
+            {FOCUS_BUBBLE_BG_SIZES.map(size => (
+              <option key={size} value={size}>{t(`focus.bgSize.${size}`)}</option>
+            ))}
+          </select>
+        )}
+      />
+      <Row
+        title={t('focus.customTextColor')}
+        hint={t('focus.customHint')}
+        control={<ColorField value={value('TextColor')} onChange={next => set('TextColor', next)} />}
+      />
+      <Row
+        title={t('focus.customFont')}
+        hint={t('focus.customHint')}
+        control={<FontSelect value={value('Font')} onChange={next => set('Font', next)} t={t} />}
+      />
+      <Row
+        title={t('focus.customFontSize')}
+        hint={t('focus.customHint')}
+        control={(
+          <PresetSelect
+            presets={FONT_SIZE_PRESETS}
+            value={value('FontSize')}
+            emptyKey="focus.fontSizeDefault"
+            customKey="focus.customValue"
+            onChange={next => set('FontSize', next)}
+            t={t}
+          />
+        )}
+      />
+      <Row
+        title={t('focus.customPadding')}
+        hint={t('focus.customHint')}
+        control={(
+          <PresetSelect
+            presets={PADDING_PRESETS}
+            value={value('Padding')}
+            emptyKey="focus.paddingDefault"
+            customKey="focus.customValue"
+            onChange={next => set('Padding', next)}
+            t={t}
+          />
+        )}
+      />
+      <button
+        type="button"
+        className={css.resetButton}
+        onClick={() => {
+          set('Preset', '')
+          set('Bg', '')
+          set('Border', '')
+          set('Radius', '')
+          set('MaxWidth', '')
+          set('BgImage', '')
+          set('BgSize', 'cover')
+          set('GradientFrom', '')
+          set('GradientTo', '')
+          set('GradientAngle', '135')
+          set('TextColor', '')
+          set('Font', '')
+          set('FontSize', '')
+          set('Padding', '')
+        }}
+      >
+        {t('focus.customReset')}
+      </button>
+    </div>
+  )
+}
+
+/** The ChatFocus display settings page. */
+export const ChatFocusSection = memo(function ChatFocusSection({
+  close, useFocusSettings, setFocusField, t,
+}: ChatFocusSectionProps) {
+  const focus = useFocusSettings(value => value)
+  const setField = (field: keyof ConversationSettings, value: unknown): void => {
+    setFocusField(field, value)
   }
 
   return (
@@ -305,250 +679,8 @@ export const ChatFocusSection = memo(function ChatFocusSection({
               />
             )}
           />
-          <div className={css.customBlock}>
-            <span className={css.customTitle}>{t('focus.customGroup')}</span>
-            <Row
-              title={t('focus.preset')}
-              hint={t('focus.presetHint')}
-              control={(
-                <select
-                  className={css.select}
-                  value={activePreset(focus)}
-                  onChange={event => {
-                    const id = event.target.value
-                    if (id === '__custom__') {
-                      setField('focusBubblePreset', '')
-                      return
-                    }
-                    const preset = BUBBLE_PRESETS.find(candidate => candidate.id === id)
-                    if (preset === undefined) return
-                    setField('focusBubblePreset', id)
-                    setField('focusBubbleBg', preset.values.bg ?? '')
-                    setField('focusBubbleBorder', preset.values.border ?? '')
-                    setField('focusBubbleRadius', preset.values.radius ?? '')
-                    setField('focusBubbleMaxWidth', preset.values.maxWidth ?? '')
-                    setField('focusBubbleBgImage', preset.values.bgImage ?? '')
-                  }}
-                >
-                  {BUBBLE_PRESETS.map(preset => (
-                    <option key={preset.id || 'default'} value={preset.id}>
-                      {t((preset.id === '' ? 'focus.preset.default' : `focus.preset.${preset.id}`) as ConversationKey)}
-                    </option>
-                  ))}
-                  <option value="__custom__">{t('focus.preset.custom')}</option>
-                </select>
-              )}
-            />
-            <Row
-              title={t('focus.customBg')}
-              hint={t('focus.customHint')}
-              control={(
-                <ColorField
-                  value={focus.focusBubbleBg}
-                  onChange={next => setField('focusBubbleBg', next)}
-                />
-              )}
-            />
-            <Row
-              title={t('focus.customBorder')}
-              hint={t('focus.customHint')}
-              control={(
-                <ColorField
-                  value={focus.focusBubbleBorder}
-                  onChange={next => setField('focusBubbleBorder', next)}
-                />
-              )}
-            />
-            <Row
-              title={t('focus.customRadius')}
-              hint={t('focus.customHint')}
-              control={(
-                <input
-                  type="text"
-                  className={css.textInput}
-                  placeholder="12px"
-                  value={focus.focusBubbleRadius}
-                  onChange={event => setField('focusBubbleRadius', event.target.value)}
-                />
-              )}
-            />
-            <Row
-              title={t('focus.customMaxWidth')}
-              hint={t('focus.customHint')}
-              control={(
-                <input
-                  type="text"
-                  className={css.textInput}
-                  placeholder="720px"
-                  value={focus.focusBubbleMaxWidth}
-                  onChange={event => setField('focusBubbleMaxWidth', event.target.value)}
-                />
-              )}
-            />
-            <Row
-              title={t('focus.customBgImage')}
-              hint={t('focus.customBgImageHint')}
-              control={(
-                <div className={css.bgImageControl}>
-                  <input
-                    ref={fileRef}
-                    type="file"
-                    accept="image/*"
-                    hidden
-                    onChange={onFilePicked}
-                  />
-                  <button
-                    type="button"
-                    className={css.uploadButton}
-                    onClick={() => fileRef.current?.click()}
-                  >
-                    {t('focus.upload')}
-                  </button>
-                  {focus.focusBubbleBgImage !== '' && (
-                    <img
-                      className={css.bgThumb}
-                      src={focus.focusBubbleBgImage}
-                      alt=""
-                    />
-                  )}
-                  <input
-                    type="text"
-                    className={css.textInput}
-                    placeholder="https://… 或 data:image/…"
-                    value={focus.focusBubbleBgImage}
-                    onChange={event => setField('focusBubbleBgImage', event.target.value)}
-                  />
-                  {focus.focusBubbleBgImage !== '' && (
-                    <button
-                      type="button"
-                      className={css.clearButton}
-                      onClick={() => setField('focusBubbleBgImage', '')}
-                    >
-                      {t('focus.clearImage')}
-                    </button>
-                  )}
-                </div>
-              )}
-            />
-            {uploadError !== null && (
-              <span className={css.uploadError} role="status">{uploadError}</span>
-            )}
-            <Row
-              title={t('focus.bgSize')}
-              hint={t('focus.bgSizeHint')}
-              control={(
-                <select
-                  className={css.select}
-                  value={focus.focusBubbleBgSize}
-                  onChange={event => setField('focusBubbleBgSize', event.target.value as FocusBubbleBgSize)}
-                >
-                  {FOCUS_BUBBLE_BG_SIZES.map(size => (
-                    <option key={size} value={size}>{t(`focus.bgSize.${size}`)}</option>
-                  ))}
-                </select>
-              )}
-            />
-            <Row
-              title={t('focus.customTextColor')}
-              hint={t('focus.customHint')}
-              control={(
-                <ColorField
-                  value={focus.focusBubbleTextColor}
-                  onChange={next => setField('focusBubbleTextColor', next)}
-                />
-              )}
-            />
-            <Row
-              title={t('focus.customFont')}
-              hint={t('focus.customHint')}
-              control={(
-                <input
-                  type="text"
-                  className={css.textInput}
-                  placeholder="'PingFang SC', sans-serif"
-                  value={focus.focusBubbleFont}
-                  onChange={event => setField('focusBubbleFont', event.target.value)}
-                />
-              )}
-            />
-            <Row
-              title={t('focus.customFontSize')}
-              hint={t('focus.customHint')}
-              control={(
-                <input
-                  type="text"
-                  className={css.textInput}
-                  placeholder="15px"
-                  value={focus.focusBubbleFontSize}
-                  onChange={event => setField('focusBubbleFontSize', event.target.value)}
-                />
-              )}
-            />
-            <Row
-              title={t('focus.customPadding')}
-              hint={t('focus.customHint')}
-              control={(
-                <input
-                  type="text"
-                  className={css.textInput}
-                  placeholder="10px 14px"
-                  value={focus.focusBubblePadding}
-                  onChange={event => setField('focusBubblePadding', event.target.value)}
-                />
-              )}
-            />
-            <button
-              type="button"
-              className={css.resetButton}
-              onClick={() => {
-                setField('focusBubblePreset', '')
-                setField('focusBubbleBg', '')
-                setField('focusBubbleBorder', '')
-                setField('focusBubbleRadius', '')
-                setField('focusBubbleMaxWidth', '')
-                setField('focusBubbleBgImage', '')
-                setField('focusBubbleTextColor', '')
-                setField('focusBubbleFont', '')
-                setField('focusBubbleFontSize', '')
-                setField('focusBubblePadding', '')
-              }}
-            >
-              {t('focus.customReset')}
-            </button>
-            <Row
-              title={t('focus.userBubble')}
-              hint={t('focus.userBubbleHint')}
-              control={(
-                <ColorField
-                  value={focus.focusUserBubbleBg}
-                  onChange={next => setField('focusUserBubbleBg', next)}
-                />
-              )}
-            />
-            <Row
-              title={t('focus.userTextColor')}
-              hint={t('focus.customHint')}
-              control={(
-                <ColorField
-                  value={focus.focusUserBubbleTextColor}
-                  onChange={next => setField('focusUserBubbleTextColor', next)}
-                />
-              )}
-            />
-            <Row
-              title={t('focus.userFont')}
-              hint={t('focus.customHint')}
-              control={(
-                <input
-                  type="text"
-                  className={css.textInput}
-                  placeholder="'PingFang SC', sans-serif"
-                  value={focus.focusUserBubbleFont}
-                  onChange={event => setField('focusUserBubbleFont', event.target.value)}
-                />
-              )}
-            />
-          </div>
+          <BubbleSideEditor side="assistant" focus={focus} setField={setField} t={t} />
+          <BubbleSideEditor side="user" focus={focus} setField={setField} t={t} />
           <div className={css.previewWrap}>
             <span className={css.previewLabel}>{t('focus.preview')} · {t('focus.previewExample')}</span>
             <RuntimeFoldBox
@@ -564,54 +696,19 @@ export const ChatFocusSection = memo(function ChatFocusSection({
               role="assistant"
               compact={focus.focusBubbleStyle === 'compact'}
               time={Date.now()}
-              custom={{
-                bg: focus.focusBubbleBg,
-                border: focus.focusBubbleBorder,
-                radius: focus.focusBubbleRadius,
-                maxWidth: focus.focusBubbleMaxWidth,
-                bgImage: focus.focusBubbleBgImage,
-                bgSize: focus.focusBubbleBgSize,
-                textColor: focus.focusBubbleTextColor,
-                font: focus.focusBubbleFont,
-                fontSize: focus.focusBubbleFontSize,
-                padding: focus.focusBubblePadding,
-              }}
+              custom={previewCustom(focus, 'assistant')}
             >
               <div className={css.previewReply}>这是正式回复示例文本。</div>
             </ChatBubble>
             <div className={css.previewUserWrap}>
               <span className={css.previewLabel}>{t('focus.previewUser')}</span>
-              <div
-                className={css.previewUserBubble}
-                style={{
-                  ...(focus.focusUserBubbleBg !== '' ? { background: focus.focusUserBubbleBg } : {}),
-                  ...(focus.focusUserBubbleTextColor !== '' ? { color: focus.focusUserBubbleTextColor } : {}),
-                  ...(focus.focusUserBubbleFont !== '' ? { fontFamily: focus.focusUserBubbleFont } : {}),
-                }}
-              >
+              <div className={css.previewUserBubble} style={previewUserStyle(focus)}>
                 这是用户消息示例。
               </div>
             </div>
           </div>
         </div>
       </details>
-      <Modal
-        open={cropSource !== null}
-        onClose={() => setCropSource(null)}
-        title={t('focus.cropTitle')}
-        closeLabel={t('details.close')}
-      >
-        {cropSource !== null && (
-          <ImageCropper
-            imageUrl={cropSource}
-            onConfirm={dataUrl => {
-              setField('focusBubbleBgImage', dataUrl)
-              setCropSource(null)
-            }}
-            onCancel={() => setCropSource(null)}
-          />
-        )}
-      </Modal>
     </div>
   )
 })

@@ -17,15 +17,23 @@
   max-width: min(525px, 82%);
 }
 .bubble {
-  /* 525px cap inside the 736 column; percentage keeps narrow windows sane. */
-  max-width: 100%;
-  background: var(--dsw-specific-bubble);
-  border-radius: 22px;
+  /* 525px cap inside the 736 column; percentage keeps narrow windows sane.
+     All chrome reads --cf-user-* variables (set by the focus view on the
+     row container) so user bubbles share the full customization surface
+     with assistant bubbles. */
+  max-width: var(--cf-user-bubble-max-width, 100%);
+  background-color: var(--cf-user-bubble-bg, var(--dsw-specific-bubble));
+  border: 1px solid var(--cf-user-bubble-border, transparent);
+  border-radius: var(--cf-user-bubble-radius, 22px);
   /* 44px single-line bubble: 24 line + 10 vertical padding each side. */
-  padding: 10px 16px;
-  font-size: 16px;
+  padding: var(--cf-user-bubble-padding, 10px 16px);
+  font-size: var(--cf-user-bubble-font-size, 16px);
   line-height: 24px;
-  color: var(--dsw-alias-label-primary);
+  color: var(--cf-user-bubble-text-color, var(--dsw-alias-label-primary));
+  font-family: var(--cf-user-bubble-font, inherit);
+  background-image: var(--cf-user-bubble-bg-image, none);
+  background-size: var(--cf-user-bubble-bg-size, cover);
+  background-position: center;
 }
 
 .contextRow {
