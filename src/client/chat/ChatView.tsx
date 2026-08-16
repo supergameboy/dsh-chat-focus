@@ -18,7 +18,7 @@
 // lifecycle updates replace only their own row without remounting it.
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import type { ReactNode } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 import type { ConversationTimelineSnapshot } from '@deepseek-ai/dsh-client-runtime/client'
 import type { ChatConversationViewNode } from '@deepseek-ai/dsh-client-runtime/client'
 import { IconChevronDownOutline14 } from '@deepseek-ai/dsh-client-ui-primitives'
@@ -219,9 +219,27 @@ function FocusGroupRow({ group, focus, nodeStore, renderSeat, useSession, loadIm
       </div>
     )
   }
-  if (group.kind === 'tail' || group.kind === 'other' || group.kind === 'user') {
+  if (group.kind === 'tail' || group.kind === 'other') {
     return (
       <div className={css.flowItem} data-chat-flow-key={group.nodeKey} data-chat-flow-kind={group.kind}>
+        {renderSeat(group.nodeKey)}
+      </div>
+    )
+  }
+  if (group.kind === 'user') {
+    // The host user row renders its own bubble whose background reads
+    // --dsw-specific-bubble; overriding that variable on this container
+    // customizes the user bubble color (inherited by the inner bubble).
+    const userStyle = focus.focusUserBubbleBg !== ''
+      ? { '--dsw-specific-bubble': focus.focusUserBubbleBg } as CSSProperties
+      : undefined
+    return (
+      <div
+        className={css.flowItem}
+        data-chat-flow-key={group.nodeKey}
+        data-chat-flow-kind={group.kind}
+        style={userStyle}
+      >
         {renderSeat(group.nodeKey)}
       </div>
     )

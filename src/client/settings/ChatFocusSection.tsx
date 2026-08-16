@@ -386,6 +386,16 @@ export const ChatFocusSection = memo(function ChatFocusSection({
             >
               {t('focus.customReset')}
             </button>
+            <Row
+              title={t('focus.userBubble')}
+              hint={t('focus.userBubbleHint')}
+              control={(
+                <ColorField
+                  value={focus.focusUserBubbleBg}
+                  onChange={next => setField('focusUserBubbleBg', next)}
+                />
+              )}
+            />
           </div>
           <div className={css.previewWrap}>
             <span className={css.previewLabel}>{t('focus.preview')} · {t('focus.previewExample')}</span>

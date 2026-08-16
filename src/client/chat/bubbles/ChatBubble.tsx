@@ -1,11 +1,13 @@
 // ChatBubble: themeable chat-bubble chrome for assistant text replies —
-// role icon, HH:MM (calendar-aware) time, the compact density variant, and
-// user-defined colors/border/radius/width/background image via CSS variables.
+// DeepSeek fish logo, HH:MM (calendar-aware) time, the compact density
+// variant, and user-defined colors/border/radius/width/background image via
+// CSS variables. The default look mirrors the host user bubble (deepseek
+// theme blue), so the two sides stay consistent out of the box.
 
 import { memo } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
 import clsx from 'clsx'
-import { IconThinkOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
+import { FishLogo } from '@deepseek-ai/dsh-client-ui-primitives'
 import css from './ChatBubble.module.css'
 
 /** Clock label for one message timestamp (HH:MM; calendar date when older than today). */
@@ -73,7 +75,7 @@ export const ChatBubble = memo(function ChatBubble({
     <div className={clsx(css.bubble, role === 'user' ? css.user : css.assistant, compact && css.compact)} style={bubbleStyle as CSSProperties}>
       <div className={css.header}>
         <span className={css.roleIcon} aria-hidden>
-          <IconThinkOutline16 size={14} />
+          <FishLogo size={14} />
         </span>
         {time !== undefined && (
           <span className={css.clock}>{bubbleTimeLabel(time, Date.now())}</span>

@@ -1,7 +1,8 @@
-/* ChatBubble: assistant reply bubble chrome. Colors map to host dsw alias
-   tokens by default; user-defined overrides arrive as CSS variables
-   (--cf-bubble-*) set inline by the component. The compact variant lowers
-   density. */
+/* ChatBubble: assistant reply bubble chrome. The default mirrors the host
+   user bubble — deepseek theme blue background (--dsw-specific-bubble),
+   22px radius, no border — so both sides stay consistent. User-defined
+   overrides arrive as CSS variables (--cf-bubble-*) set inline by the
+   component. The compact variant lowers density. */
 
 .bubble {
   display: flex;
@@ -31,10 +32,10 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
-  color: var(--dsw-alias-label-secondary);
+  color: var(--dsw-static-deepseek-500);
   background: var(--dsw-alias-bg-layer-2);
 }
 
@@ -46,25 +47,17 @@
 
 .content {
   min-width: 0;
-  border-radius: var(--cf-bubble-radius, 12px);
+  border-radius: var(--cf-bubble-radius, 22px);
   padding: 10px 14px;
   overflow-wrap: anywhere;
-  background-color: var(--cf-bubble-bg, var(--dsw-alias-bg-layer-2));
-  border: 1px solid var(--cf-bubble-border, var(--dsw-alias-border-l1));
+  background-color: var(--cf-bubble-bg, var(--dsw-specific-bubble));
+  border: 1px solid var(--cf-bubble-border, transparent);
   background-image: var(--cf-bubble-bg-image, none);
   background-size: cover;
   background-position: center;
 }
 
-.assistant .content {
-  border-top-left-radius: var(--cf-bubble-corner, 4px);
-}
-
 .compact .content {
-  border-radius: 10px;
+  border-radius: var(--cf-bubble-radius, 14px);
   padding: 6px 10px;
-}
-
-.compact.assistant .content {
-  border-top-left-radius: 3px;
 }
