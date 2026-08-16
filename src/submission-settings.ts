@@ -51,6 +51,11 @@ export const FOCUS_BUBBLE_RADIUS_FIELD = 'focusBubbleRadius'
 export const FOCUS_BUBBLE_MAX_WIDTH_FIELD = 'focusBubbleMaxWidth'
 /** Custom assistant-bubble background image (URL or data URI; empty = none). */
 export const FOCUS_BUBBLE_BG_IMAGE_FIELD = 'focusBubbleBgImage'
+/** Background-image fit modes for the assistant bubble. */
+export const FOCUS_BUBBLE_BG_SIZES = ['cover', 'contain', 'stretch'] as const
+export type FocusBubbleBgSize = typeof FOCUS_BUBBLE_BG_SIZES[number]
+/** Background-image fit mode field name. */
+export const FOCUS_BUBBLE_BG_SIZE_FIELD = 'focusBubbleBgSize'
 /** Bubble template id ('' = none/custom); selecting one fills the custom fields. */
 export const FOCUS_BUBBLE_PRESET_FIELD = 'focusBubblePreset'
 /** Custom user-bubble background (CSS color; empty = theme default deepseek blue). */
@@ -82,6 +87,7 @@ export const DEFAULT_FOCUS_BUBBLE_BORDER = ''
 export const DEFAULT_FOCUS_BUBBLE_RADIUS = ''
 export const DEFAULT_FOCUS_BUBBLE_MAX_WIDTH = ''
 export const DEFAULT_FOCUS_BUBBLE_BG_IMAGE = ''
+export const DEFAULT_FOCUS_BUBBLE_BG_SIZE: FocusBubbleBgSize = 'cover'
 export const DEFAULT_FOCUS_BUBBLE_PRESET = ''
 export const DEFAULT_FOCUS_USER_BUBBLE_BG = ''
 export const DEFAULT_FOCUS_BUBBLE_TEXT_COLOR = ''
@@ -107,6 +113,7 @@ export const DEFAULT_CONVERSATION_SETTINGS: ConversationSettings = {
   focusBubbleRadius: DEFAULT_FOCUS_BUBBLE_RADIUS,
   focusBubbleMaxWidth: DEFAULT_FOCUS_BUBBLE_MAX_WIDTH,
   focusBubbleBgImage: DEFAULT_FOCUS_BUBBLE_BG_IMAGE,
+  focusBubbleBgSize: DEFAULT_FOCUS_BUBBLE_BG_SIZE,
   focusBubblePreset: DEFAULT_FOCUS_BUBBLE_PRESET,
   focusUserBubbleBg: DEFAULT_FOCUS_USER_BUBBLE_BG,
   focusBubbleTextColor: DEFAULT_FOCUS_BUBBLE_TEXT_COLOR,
@@ -145,6 +152,8 @@ export interface ChatFocusSettings {
   focusBubbleMaxWidth: string
   /** Custom assistant-bubble background image (empty = none). */
   focusBubbleBgImage: string
+  /** Background-image fit mode. */
+  focusBubbleBgSize: FocusBubbleBgSize
   /** Bubble template id (empty = none/custom). */
   focusBubblePreset: string
   /** Custom user-bubble background color (empty = theme deepseek blue). */
@@ -185,6 +194,7 @@ export const ConversationSettingsSchema: z<ConversationSettings> = z.object({
   [FOCUS_BUBBLE_RADIUS_FIELD]: z.string().default(DEFAULT_FOCUS_BUBBLE_RADIUS),
   [FOCUS_BUBBLE_MAX_WIDTH_FIELD]: z.string().default(DEFAULT_FOCUS_BUBBLE_MAX_WIDTH),
   [FOCUS_BUBBLE_BG_IMAGE_FIELD]: z.string().default(DEFAULT_FOCUS_BUBBLE_BG_IMAGE),
+  [FOCUS_BUBBLE_BG_SIZE_FIELD]: z.union([...FOCUS_BUBBLE_BG_SIZES]).default(DEFAULT_FOCUS_BUBBLE_BG_SIZE),
   [FOCUS_BUBBLE_PRESET_FIELD]: z.string().default(DEFAULT_FOCUS_BUBBLE_PRESET),
   [FOCUS_USER_BUBBLE_BG_FIELD]: z.string().default(DEFAULT_FOCUS_USER_BUBBLE_BG),
   [FOCUS_BUBBLE_TEXT_COLOR_FIELD]: z.string().default(DEFAULT_FOCUS_BUBBLE_TEXT_COLOR),

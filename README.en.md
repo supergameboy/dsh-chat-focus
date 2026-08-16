@@ -10,10 +10,12 @@ Implementation: a fork of the host `@deepseek-ai/dsh-client-ui-conversation` (rc
 
 - **Folded runtime activity**: consecutive runtime nodes before each text reply (tool-call, thinking, retry, context, command, compaction, …) collapse into an expandable box; **thinking (think) blocks fold into the same box** — no separate row
 - **Keep the most recent N replies expanded**: `focusKeepVisible` means "replies kept expanded N" — the runtime runs of the most recent N reply bubbles render expanded; older runs fold. Live (streaming, no reply yet) activity stays visible
+- **Three fold strategies** (selectable in settings): Expand recent N replies (keep-recent) / Threshold fold (fold once entries exceed N) / Fold all (always)
 - **Chat bubbles**: assistant replies render as left-side bubbles (DeepSeek fish logo + HH:MM clock, calendar-aware); the default look mirrors the host user bubble (DeepSeek theme blue, 22px radius); user messages keep the host bubble
-- **Fold summary**: category counts (tools / thinking / other) plus a deduped tool-name list (up to 5); open/closed state persists per run in localStorage (invalidated automatically when the strategy changes)
+- **Fold summary**: category counts (tools / thinking / other) plus a deduped tool-name list (up to 5); open/closed state persists per run in localStorage (invalidated automatically when the strategy changes); long runs render **windowed** (virtual list, constant render cost)
 - **Deep customization** (Settings → Chat Display → Appearance):
-  - Assistant bubble, 9 knobs: background, border, radius, max width, background image, text color, font family, font size, padding (any CSS value)
+  - Assistant bubble, 10 knobs: background, border, radius, max width, background image, background fit (cover/contain/stretch), text color, font family, font size, padding (any CSS value)
+  - Background image supports **local upload + crop dialog** (drag/resize frame, canvas export, ≤2MB)
   - User bubble, 3 knobs: background, text color, font family
   - 6 built-in templates: Default / Sky / Mint / Gradient / Dark / Texture
   - Live preview: fold box + assistant bubble + user bubble
@@ -67,10 +69,10 @@ Settings fields (namespace `ui-conversation`, extended schema; already allowed b
 | focusKeepVisible | number(0-10) | 1 | Replies kept expanded N |
 | focusDefaultOpen | boolean | false | Fold boxes start expanded |
 | focusSummary | boolean | true | Fold summary (counts + tool names) |
-| focusStrategy | keep-recent/threshold/always | keep-recent | Fold strategy (v0.1 implements keep-recent only; other options disabled) |
+| focusStrategy | keep-recent/threshold/always | keep-recent | Fold strategy (expand recent N / threshold fold / fold all) |
 | focusBubbleStyle | default/compact | default | Bubble density |
 | focusReasoning | boolean | true | Text-less thinking steps join the runtime run |
-| focusBubbleBg / Border / Radius / MaxWidth / BgImage | string | '' | Assistant bubble custom chrome (bg / border / radius / max width / bg image) |
+| focusBubbleBg / Border / Radius / MaxWidth / BgImage / BgSize | string | '' / cover | Assistant bubble custom chrome (bg / border / radius / max width / bg image / fit) |
 | focusBubbleTextColor / Font / FontSize / Padding | string | '' | Assistant bubble text custom (color / font / size / padding) |
 | focusBubblePreset | string | '' | Bubble template id |
 | focusUserBubbleBg / TextColor / Font | string | '' | User bubble custom (bg / text color / font) |
@@ -90,7 +92,7 @@ pnpm run test:engine # grouping engine behavior checks (tsx)
 
 | Host version | Fork version | Notes |
 |--------------|--------------|-------|
-| rc.5 (2026-08-16 baseline) | 0.1.0 | current baseline |
+| rc.5 (2026-08-16 baseline) | 0.2.0 | current baseline (v0.2: full fold strategies, bg upload/crop/fit, fold-box virtualization) |
 
 When the host upgrades:
 1. Walk `docs/design/ui-design-20260816-dsh-chat-focus-模块1-基底复制域.md` §2.3 slot-contract table (21 slots + `conversation` service + node data model);
@@ -100,11 +102,10 @@ When the host upgrades:
 
 The host is pre-release (contracts may drift). If adaptation cost exceeds maintenance capacity, the alternative design (view-add-on, zero-surgery plugin row) is documented in `docs/design/solution-design-20260816-dsh-chat-focus-备选方案-视图附加型.md`.
 
-## Known limitations (v0.1)
+## Known limitations (v0.2)
 
-- `focusStrategy` `threshold`/`always` not implemented (disabled in settings; historical values degrade to keep-recent)
-- The settings preview uses built-in sample data (the section seat is root-scoped; v0.2 will add a real-session channel via inject)
-- Fold-box content renders as a plain list (inner scroll container; window virtualization + row-height calibration are v0.2 work)
+- The settings preview uses built-in sample data (the section seat is root-scoped; real-session preview is deferred per feedback)
+- Fold-box virtualization uses an estimated row height (fixed 56px spacing); measured row-height calibration is v0.3 work
 - The user bubble is host-rendered; background/text color/font are customizable via CSS-variable inheritance, while host-fixed values (radius, font size) are not adjustable yet
 
 ## License

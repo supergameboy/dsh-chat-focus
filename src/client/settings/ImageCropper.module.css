@@ -1,0 +1,125 @@
+/* ImageCropper: stage + movable/resizable frame over a contain-fitted image. */
+
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.stage {
+  position: relative;
+  width: 100%;
+  max-width: 560px;
+  height: 320px;
+  overflow: hidden;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 8px;
+  background:
+    linear-gradient(45deg, var(--dsw-alias-bg-layer-2) 25%, transparent 25%),
+    linear-gradient(-45deg, var(--dsw-alias-bg-layer-2) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, var(--dsw-alias-bg-layer-2) 75%),
+    linear-gradient(-45deg, transparent 75%, var(--dsw-alias-bg-layer-2) 75%);
+  background-size: 20px 20px;
+  background-position: 0 0, 0 10px, 10px -10px, -10px 0;
+  background-color: var(--dsw-alias-bg-base);
+}
+
+.image {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  max-width: 100%;
+  max-height: 100%;
+  user-select: none;
+  -webkit-user-drag: none;
+  pointer-events: none;
+}
+
+.frame {
+  position: absolute;
+  border: 1px solid var(--dsw-static-deepseek-500);
+  box-shadow: 0 0 0 9999px rgb(0 0 0 / 0.35);
+  cursor: move;
+  touch-action: none;
+}
+
+.gridH {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: rgb(255 255 255 / 0.7);
+}
+
+.gridH:first-of-type {
+  top: 33.3%;
+}
+
+.gridH:nth-of-type(2) {
+  top: 66.6%;
+}
+
+.gridV {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: rgb(255 255 255 / 0.7);
+}
+
+.gridV:first-of-type {
+  left: 33.3%;
+}
+
+.gridV:nth-of-type(2) {
+  left: 66.6%;
+}
+
+.handle {
+  position: absolute;
+  right: -7px;
+  bottom: -7px;
+  width: 14px;
+  height: 14px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: var(--dsw-static-deepseek-500);
+  cursor: nwse-resize;
+  touch-action: none;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.cancel {
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 6px;
+  padding: 6px 16px;
+  font-size: 13px;
+  color: var(--dsw-alias-label-secondary);
+  background: var(--dsw-alias-bg-base);
+  cursor: pointer;
+}
+
+.confirm {
+  border: 1px solid var(--dsw-static-deepseek-500);
+  border-radius: 6px;
+  padding: 6px 16px;
+  font-size: 13px;
+  color: #fff;
+  background: var(--dsw-static-deepseek-500);
+  cursor: pointer;
+}
+
+.cancel:hover {
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.confirm:hover {
+  background: var(--dsw-static-deepseek-600, var(--dsw-static-deepseek-500));
+}

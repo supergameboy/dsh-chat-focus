@@ -1,7 +1,7 @@
 {
   "name": "dsh-chat-focus",
   "description": "dsh web 对话界面插件：折叠运行时信息 + 聊天气泡 + 可配置设置（fork 自 @deepseek-ai/dsh-client-ui-conversation）",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "repository": {
     "type": "git",

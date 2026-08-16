@@ -3,19 +3,25 @@
 // fold box and bubble chrome (frozen sample data; the section seat is
 // root-scoped, so real session data needs a v0.2 inject channel).
 
-import { memo } from 'react'
+import { memo, useRef, useState } from 'react'
 import type { ObservableSnapshot } from '@deepseek-ai/dsh-client-runtime/client'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
+import { Modal } from '@deepseek-ai/dsh-client-ui-primitives'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type { ConversationSettings } from '../../submission-settings.ts'
 import {
-  FOCUS_BUBBLE_STYLES, FOCUS_STRATEGIES, type FocusBubbleStyle, type FocusFoldStrategy,
+  FOCUS_BUBBLE_BG_SIZES, FOCUS_BUBBLE_STYLES, FOCUS_STRATEGIES,
+  type FocusBubbleBgSize, type FocusBubbleStyle, type FocusFoldStrategy,
 } from '../../submission-settings.ts'
 import type { ChatBubbleCustomStyle } from '../chat/bubbles/ChatBubble.tsx'
 import { RuntimeFoldBox, type RuntimeFoldBoxProps } from '../chat/bubbles/RuntimeFoldBox.tsx'
 import { ChatBubble } from '../chat/bubbles/ChatBubble.tsx'
+import { ImageCropper } from './ImageCropper.tsx'
 import type { ConversationKey } from '../locales.ts'
 import css from './ChatFocusSection.module.css'
+
+/** Max uploaded background-image file size (keeps the settings file sane). */
+const MAX_UPLOAD_BYTES = 2 * 1024 * 1024
 
 /** One built-in bubble template: fills the custom fields with one pick. */
 interface BubblePreset {
@@ -155,6 +161,26 @@ export const ChatFocusSection = memo(function ChatFocusSection({
   const setField = (field: keyof ConversationSettings, value: unknown): void => {
     setFocusField(field, value)
   }
+  const fileRef = useRef<HTMLInputElement>(null)
+  const [cropSource, setCropSource] = useState<string | null>(null)
+  const [uploadError, setUploadError] = useState<string | null>(null)
+
+  const onFilePicked = (event: React.ChangeEvent<HTMLInputElement>): void => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (file === undefined) return
+    if (file.size > MAX_UPLOAD_BYTES) {
+      setUploadError(t('focus.uploadTooLarge'))
+      return
+    }
+    setUploadError(null)
+    const reader = new FileReader()
+    reader.onload = () => {
+      if (typeof reader.result === 'string') setCropSource(reader.result)
+    }
+    reader.readAsDataURL(file)
+  }
+
   return (
     <div className={css.root} role="tabpanel" aria-label={t('focus.sectionLabel')}>
       <div className={css.header}>
@@ -363,13 +389,63 @@ export const ChatFocusSection = memo(function ChatFocusSection({
               title={t('focus.customBgImage')}
               hint={t('focus.customBgImageHint')}
               control={(
-                <input
-                  type="text"
-                  className={css.textInput}
-                  placeholder="https://… 或 data:image/…"
-                  value={focus.focusBubbleBgImage}
-                  onChange={event => setField('focusBubbleBgImage', event.target.value)}
-                />
+                <div className={css.bgImageControl}>
+                  <input
+                    ref={fileRef}
+                    type="file"
+                    accept="image/*"
+                    hidden
+                    onChange={onFilePicked}
+                  />
+                  <button
+                    type="button"
+                    className={css.uploadButton}
+                    onClick={() => fileRef.current?.click()}
+                  >
+                    {t('focus.upload')}
+                  </button>
+                  {focus.focusBubbleBgImage !== '' && (
+                    <img
+                      className={css.bgThumb}
+                      src={focus.focusBubbleBgImage}
+                      alt=""
+                    />
+                  )}
+                  <input
+                    type="text"
+                    className={css.textInput}
+                    placeholder="https://… 或 data:image/…"
+                    value={focus.focusBubbleBgImage}
+                    onChange={event => setField('focusBubbleBgImage', event.target.value)}
+                  />
+                  {focus.focusBubbleBgImage !== '' && (
+                    <button
+                      type="button"
+                      className={css.clearButton}
+                      onClick={() => setField('focusBubbleBgImage', '')}
+                    >
+                      {t('focus.clearImage')}
+                    </button>
+                  )}
+                </div>
+              )}
+            />
+            {uploadError !== null && (
+              <span className={css.uploadError} role="status">{uploadError}</span>
+            )}
+            <Row
+              title={t('focus.bgSize')}
+              hint={t('focus.bgSizeHint')}
+              control={(
+                <select
+                  className={css.select}
+                  value={focus.focusBubbleBgSize}
+                  onChange={event => setField('focusBubbleBgSize', event.target.value as FocusBubbleBgSize)}
+                >
+                  {FOCUS_BUBBLE_BG_SIZES.map(size => (
+                    <option key={size} value={size}>{t(`focus.bgSize.${size}`)}</option>
+                  ))}
+                </select>
               )}
             />
             <Row
@@ -494,6 +570,7 @@ export const ChatFocusSection = memo(function ChatFocusSection({
                 radius: focus.focusBubbleRadius,
                 maxWidth: focus.focusBubbleMaxWidth,
                 bgImage: focus.focusBubbleBgImage,
+                bgSize: focus.focusBubbleBgSize,
                 textColor: focus.focusBubbleTextColor,
                 font: focus.focusBubbleFont,
                 fontSize: focus.focusBubbleFontSize,
@@ -518,6 +595,23 @@ export const ChatFocusSection = memo(function ChatFocusSection({
           </div>
         </div>
       </details>
+      <Modal
+        open={cropSource !== null}
+        onClose={() => setCropSource(null)}
+        title={t('focus.cropTitle')}
+        closeLabel={t('details.close')}
+      >
+        {cropSource !== null && (
+          <ImageCropper
+            imageUrl={cropSource}
+            onConfirm={dataUrl => {
+              setField('focusBubbleBgImage', dataUrl)
+              setCropSource(null)
+            }}
+            onCancel={() => setCropSource(null)}
+          />
+        )}
+      </Modal>
     </div>
   )
 })

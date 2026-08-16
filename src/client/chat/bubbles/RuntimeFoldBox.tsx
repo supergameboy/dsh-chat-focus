@@ -13,6 +13,12 @@ import css from './RuntimeFoldBox.module.css'
 /** Fold box visibility state (legacy 'partial' values map to expanded). */
 export type FoldBoxState = 'collapsed' | 'expanded'
 
+/** Windowed rendering constants for long runs (estimated row height). */
+const VIRTUAL_ROW_HEIGHT = 56
+const VIRTUAL_VIEWPORT_HEIGHT = 360
+const VIRTUAL_OVERSCAN = 4
+const VIRTUAL_THRESHOLD = 20
+
 const FOLD_STATE_PREFIX = 'dsh.chat-focus.fold.'
 
 function readStored(key: string): FoldBoxState | null {
@@ -75,6 +81,18 @@ export const RuntimeFoldBox = memo(function RuntimeFoldBox({
     writeStored(storageKey, next ? 'expanded' : 'collapsed')
   }
 
+  // Windowed rendering for long runs: estimated row height + spacer offsets.
+  // Short runs render plainly (no virtualization overhead).
+  const [scrollTop, setScrollTop] = useState(0)
+  const virtualized = open && insideItems.length > VIRTUAL_THRESHOLD
+  const windowStart = virtualized ? Math.max(0, Math.floor(scrollTop / VIRTUAL_ROW_HEIGHT)) : 0
+  const windowCount = virtualized
+    ? Math.ceil(VIRTUAL_VIEWPORT_HEIGHT / VIRTUAL_ROW_HEIGHT) + VIRTUAL_OVERSCAN
+    : insideItems.length
+  const visibleItems = virtualized
+    ? insideItems.slice(windowStart, windowStart + windowCount)
+    : insideItems
+
   const namesText = summary.toolNames.slice(0, SUMMARY_TOOL_NAME_LIMIT).join('、')
   const overflow = Math.max(0, summary.toolNames.length - SUMMARY_TOOL_NAME_LIMIT)
 
@@ -104,15 +122,44 @@ export const RuntimeFoldBox = memo(function RuntimeFoldBox({
         </span>
       </summary>
       {open && (
-        <div className={css.body} data-chat-fold-virtual="">
-          {insideItems.map((item, index) => (
-            <div
-              key={item.kind === 'node' ? item.nodeKey : `${item.nodeKey}:think:${index}`}
-              className={css.bodyItem}
-            >
-              {renderItem(item, index)}
-            </div>
-          ))}
+        <div
+          className={css.body}
+          data-chat-fold-virtual=""
+          onScroll={virtualized ? event => setScrollTop(event.currentTarget.scrollTop) : undefined}
+        >
+          {virtualized
+            ? (
+              <div style={{ height: insideItems.length * VIRTUAL_ROW_HEIGHT, position: 'relative' }}>
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    transform: `translateY(${windowStart * VIRTUAL_ROW_HEIGHT}px)`,
+                  }}
+                >
+                  {visibleItems.map((item, index) => (
+                    <div
+                      key={item.kind === 'node' ? item.nodeKey : `${item.nodeKey}:think:${windowStart + index}`}
+                      className={css.bodyItem}
+                    >
+                      {renderItem(item, windowStart + index)}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )
+            : (
+              insideItems.map((item, index) => (
+                <div
+                  key={item.kind === 'node' ? item.nodeKey : `${item.nodeKey}:think:${index}`}
+                  className={css.bodyItem}
+                >
+                  {renderItem(item, index)}
+                </div>
+              ))
+            )}
         </div>
       )}
     </details>

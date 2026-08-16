@@ -148,21 +148,24 @@ function reasoningItemsOf(node: ChatConversationViewNode): RunItem[] {
 /**
  * Build the focus row sequence from the ordered node keys.
  *
- * Runs fold by default; the runs belonging to the most recent
- * `focusKeepVisible` replies (counted from the flow tail) are marked `recent`
- * and render expanded. A run still open at the tail (no following reply yet)
- * counts as recent while `focusKeepVisible > 0`, so live activity stays
- * visible during streaming.
+ * `recent` marks runs that render expanded by default, per strategy:
+ * - keep-recent: the runs belonging to the most recent `focusKeepVisible`
+ *   replies (counted from the flow tail); a run still open at the tail (no
+ *   following reply yet) counts as recent while `focusKeepVisible > 0`, so
+ *   live activity stays visible during streaming.
+ * - threshold: runs whose entry count exceeds `focusKeepVisible` fold;
+ *   shorter runs stay expanded.
+ * - always: every run folds.
  *
  * @param order - stable node key order from the conversation snapshot.
  * @param nodes - node store (get by key).
- * @param settings - focus settings (focusEnabled / focusKeepVisible / focusReasoning).
+ * @param settings - focus settings (focusEnabled / focusKeepVisible / focusStrategy / focusReasoning).
  * @returns the group rows; when disabled, rows pass through in original order.
  */
 export function buildGroups(
   order: readonly string[],
   nodes: NodeLookup,
-  settings: Pick<ChatFocusSettings, 'focusEnabled' | 'focusKeepVisible' | 'focusReasoning'>,
+  settings: Pick<ChatFocusSettings, 'focusEnabled' | 'focusKeepVisible' | 'focusStrategy' | 'focusReasoning'>,
 ): GroupRow[] {
   if (!settings.focusEnabled) {
     const rows: GroupRow[] = []
@@ -223,15 +226,19 @@ export function buildGroups(
   }
   flushRun(true)
 
-  // Mark the runs of the most recent N replies (plus any tail-open run).
+  // Mark the runs that stay expanded per the active strategy.
   const rows: GroupRow[] = []
   for (const row of built) {
     if (row.kind === 'node') {
       rows.push({ kind: row.klass, nodeKey: row.nodeKey })
       continue
     }
-    const recent = settings.focusKeepVisible > 0
-      && (row.afterReplySeq === null || row.afterReplySeq > replySeq - settings.focusKeepVisible)
+    const recent = settings.focusStrategy === 'keep-recent'
+      ? settings.focusKeepVisible > 0
+        && (row.afterReplySeq === null || row.afterReplySeq > replySeq - settings.focusKeepVisible)
+      : settings.focusStrategy === 'threshold'
+        ? row.run.items.length <= settings.focusKeepVisible
+        : false
     rows.push({
       kind: 'runtime-run',
       inside: row.run.items,

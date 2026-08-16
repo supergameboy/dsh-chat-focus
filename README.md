@@ -10,10 +10,12 @@ dsh web 对话界面插件：将文本回复之前的**连续运行时信息**�
 
 - **折叠运行时信息**：每条文本回复之前的连续运行时节点（tool-call、思考、retry、context、command、compaction 等）收进一个可展开的折叠框；**思考内容（think）也收纳在折叠框内**，不再单独占行
 - **最近 N 个回复保持展开**：`focusKeepVisible` 语义为「保持展开的最近回复数」——最近 N 个聊天气泡对应的运行时信息默认展开，这 N 个之前的旧运行时信息全部折叠；流式中尚未有回复的活动也保持可见
+- **三种折叠策略**（设置页可选）：最近 N 个回复展开（keep-recent）/ 阈值折叠（条目数超过 N 才折叠，threshold）/ 全部折叠（always）
 - **聊天气泡**：助手回复左侧气泡（DeepSeek 鱼形 logo + HH:MM 时间，跨天显示日期），默认样式与用户气泡一致（DeepSeek 主题蓝、22px 圆角）；用户消息沿用宿主气泡
-- **折叠框摘要**：分类计数（工具/思考/其他）+ 去重工具名列表（最多 5 个）；展开状态按组持久化（localStorage，策略变化自动失效旧状态）
+- **折叠框摘要**：分类计数（工具/思考/其他）+ 去重工具名列表（最多 5 个）；展开状态按组持久化（localStorage，策略变化自动失效旧状态）；长运行时组**窗口化渲染**（虚拟列表，恒定渲染成本）
 - **高度自定义**（设置页『对话显示』→ 外观）：
-  - 助手气泡 9 项：背景色、边框色、圆角、最大宽度、背景图片、文字颜色、字体、字号、内边距（任意 CSS 值）
+  - 助手气泡 10 项：背景色、边框色、圆角、最大宽度、背景图片、背景适配（cover/contain/stretch）、文字颜色、字体、字号、内边距（任意 CSS 值）
+  - 背景图片支持**本地上传 + 裁剪弹层**（拖拽移动/缩放裁剪框，canvas 导出，≤2MB）
   - 用户气泡 3 项：背景色、文字颜色、字体
   - 6 套内置模板一键套用：默认 / 浅蓝 / 薄荷绿 / 渐变 / 暗夜 / 纹理
   - 实时预览：折叠框 + 助手气泡 + 用户气泡三段示例
@@ -67,10 +69,10 @@ node scripts/uninstall.mjs --clean-settings  # 同时清理 settings.yaml 的 fo
 | focusKeepVisible | number(0-10) | 1 | 保持展开的最近回复数 N |
 | focusDefaultOpen | boolean | false | 折叠框默认展开 |
 | focusSummary | boolean | true | 折叠框摘要（计数+工具名） |
-| focusStrategy | keep-recent/threshold/always | keep-recent | 折叠策略（v0.1 仅实现 keep-recent；其余选项禁用并标注即将上线） |
+| focusStrategy | keep-recent/threshold/always | keep-recent | 折叠策略（最近 N 回复展开 / 阈值折叠 / 全部折叠） |
 | focusBubbleStyle | default/compact | default | 气泡密度 |
 | focusReasoning | boolean | true | 纯思考步骤纳入运行时组折叠 |
-| focusBubbleBg / Border / Radius / MaxWidth / BgImage | string | '' | 助手气泡自定义（背景色/边框色/圆角/最大宽度/背景图） |
+| focusBubbleBg / Border / Radius / MaxWidth / BgImage / BgSize | string | '' / cover | 助手气泡自定义（背景色/边框色/圆角/最大宽度/背景图/适配模式） |
 | focusBubbleTextColor / Font / FontSize / Padding | string | '' | 助手气泡文字自定义（颜色/字体/字号/内边距） |
 | focusBubblePreset | string | '' | 气泡模板 id |
 | focusUserBubbleBg / TextColor / Font | string | '' | 用户气泡自定义（背景色/文字颜色/字体） |
@@ -90,7 +92,7 @@ pnpm run test:engine # 分组引擎行为检查（tsx）
 
 | 宿主版本 | fork 版本 | 说明 |
 |---------|----------|------|
-| rc.5（2026-08-16 基线） | 0.1.0 | 当前基线 |
+| rc.5（2026-08-16 基线） | 0.2.0 | 当前基线（v0.2：折叠策略全模式、背景图上传/裁剪/适配、折叠框虚拟化） |
 
 宿主升级后按以下流程适配：
 1. 逐项核对 `docs/design/ui-design-20260816-dsh-chat-focus-模块1-基底复制域.md` §2.3 槽位契约保持表（21 槽位 + `conversation` 服务 + 节点数据模型）；
@@ -100,11 +102,10 @@ pnpm run test:engine # 分组引擎行为检查（tsx）
 
 宿主处于 pre-release（契约随时可漂移）——若适配成本超出维护能力，备选方案（视图附加型，零手术纯插件行）见 `docs/design/solution-design-20260816-dsh-chat-focus-备选方案-视图附加型.md`。
 
-## 已知限制（v0.1）
+## 已知限制（v0.2）
 
-- `focusStrategy` 的 `threshold`/`always` 未实现（设置页禁用，历史值按 keep-recent 降级）
-- 设置页预览为内置示例数据（settings.section 为 root scope，无会话数据通道；v0.2 通过 inject 提供真实会话通道）
-- 折叠框内节点列表为普通渲染（内部滚动容器；窗口虚拟化与行高校准为 v0.2 项）
+- 设置页预览为内置示例数据（settings.section 为 root scope，无会话数据通道；真实会话预览按反馈暂缓）
+- 折叠框虚拟化使用估算行高（固定 56px 行距），行高校准（ResizeObserver 实测）为 v0.3 项
 - 用户气泡为宿主渲染，可自定义背景色/文字颜色/字体（经 CSS 变量继承），圆角/字号等宿主固定值暂不可调
 
 ## 许可证

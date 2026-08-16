@@ -7,6 +7,7 @@ import {
 const settings = {
   focusEnabled: true,
   focusKeepVisible: 1,
+  focusStrategy: 'keep-recent' as const,
   focusReasoning: true,
 }
 
@@ -130,7 +131,28 @@ assert.equal((openZero.find(g => g.kind === 'runtime-run') as Extract<GroupRow, 
 const off = buildGroups(keys, nodes, { ...settings, focusEnabled: false })
 assert.deepEqual(off.map(g => ('nodeKey' in g ? g.nodeKey : 'run')), ['u1', 't1', 't2', 't3', 'r1'])
 
-// 7. updateSummary increments and dedupes tool names.
+// 7. threshold strategy: runs with more entries than N fold; shorter runs stay expanded.
+const thresholdNodes = store([
+  ['t1', node('tool-call', { root: { name: 'read' } }, 't1')],
+  ['r1', node('assistant-step', { blocks: [{ kind: 'text', text: 'a' }] }, 'r1')],
+  ['t2', node('tool-call', { root: { name: 'read' } }, 't2')],
+  ['t3', node('tool-call', { root: { name: 'glob' } }, 't3')],
+  ['t4', node('tool-call', { root: { name: 'grep' } }, 't4')],
+  ['r2', node('assistant-step', { blocks: [{ kind: 'text', text: 'b' }] }, 'r2')],
+])
+const threshold = buildGroups(['t1', 'r1', 't2', 't3', 't4', 'r2'], thresholdNodes, {
+  ...settings, focusStrategy: 'threshold', focusKeepVisible: 2,
+})
+const tRuns = threshold.filter(g => g.kind === 'runtime-run') as Extract<GroupRow, { kind: 'runtime-run' }>[]
+assert.equal(tRuns[0].recent, true, '1-entry run stays expanded (<= N)')
+assert.equal(tRuns[1].recent, false, '3-entry run folds (> N)')
+
+// 8. always strategy folds every run.
+const always = buildGroups(keys, nodes, { ...settings, focusStrategy: 'always' })
+const aRun = always.find(g => g.kind === 'runtime-run') as Extract<GroupRow, { kind: 'runtime-run' }>
+assert.equal(aRun.recent, false, 'always folds even the newest run')
+
+// 9. updateSummary increments and dedupes tool names.
 let s = { total: 0, toolCount: 0, thinkCount: 0, otherCount: 0, toolNames: [] as string[] }
 s = updateSummary(s, node('tool-call', { root: { name: 'read' } }))
 s = updateSummary(s, node('tool-call', { root: { name: 'read' } }))

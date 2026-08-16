@@ -37,6 +37,8 @@ export interface ChatBubbleCustomStyle {
   readonly maxWidth?: string
   /** Background image URL or data URI. */
   readonly bgImage?: string
+  /** Background-image fit: cover | contain | stretch (100% 100%). */
+  readonly bgSize?: 'cover' | 'contain' | 'stretch'
   /** CSS color for the bubble text. */
   readonly textColor?: string
   /** CSS font family for the bubble text. */
@@ -74,6 +76,9 @@ export const ChatBubble = memo(function ChatBubble({
       customVars['--cf-bubble-corner'] = custom.radius
     }
     if (custom.bgImage !== undefined && custom.bgImage !== '') customVars['--cf-bubble-bg-image'] = custom.bgImage
+    if (custom.bgSize !== undefined) {
+      customVars['--cf-bubble-bg-size'] = custom.bgSize === 'stretch' ? '100% 100%' : custom.bgSize
+    }
     if (custom.textColor !== undefined && custom.textColor !== '') customVars['--cf-bubble-text-color'] = custom.textColor
     if (custom.font !== undefined && custom.font !== '') customVars['--cf-bubble-font'] = custom.font
     if (custom.fontSize !== undefined && custom.fontSize !== '') customVars['--cf-bubble-font-size'] = custom.fontSize

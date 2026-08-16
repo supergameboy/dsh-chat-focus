@@ -53,7 +53,7 @@
   background-color: var(--cf-bubble-bg, var(--dsw-specific-bubble));
   border: 1px solid var(--cf-bubble-border, transparent);
   background-image: var(--cf-bubble-bg-image, none);
-  background-size: cover;
+  background-size: var(--cf-bubble-bg-size, cover);
   background-position: center;
   color: var(--cf-bubble-text-color, inherit);
   font-family: var(--cf-bubble-font, inherit);

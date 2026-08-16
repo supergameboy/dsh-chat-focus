@@ -287,6 +287,7 @@ function FocusGroupRow({ group, focus, nodeStore, renderSeat, useSession, loadIm
               radius: focus.focusBubbleRadius,
               maxWidth: focus.focusBubbleMaxWidth,
               bgImage: focus.focusBubbleBgImage,
+              bgSize: focus.focusBubbleBgSize,
               textColor: focus.focusBubbleTextColor,
               font: focus.focusBubbleFont,
               fontSize: focus.focusBubbleFontSize,
