@@ -22,14 +22,20 @@ dsh web 对话界面插件：将文本回复之前的**连续运行时信息**�
 
 宿主提供官方插件管理命令 `dsh plugin --profile <name> <pnpm args...>`（pnpm 转发 + 自动把声明 `dsh.bundle` 的依赖加入 `dsh.profile.bundles` 层列表）。
 
-一键脚本（推荐，含备份与校验）：
+从 npm 安装（推荐）：
+
+```sh
+dsh plugin --profile web add dsh-chat-focus
+```
+
+本地开发方式（一键脚本，含备份与校验）：
 
 ```sh
 node scripts/install.mjs          # 默认 web profile
 node scripts/install.mjs --profile web --plugin-path E:\dsh-chat-focus
 ```
 
-等价手动步骤：
+等价手动步骤（本地方式）：
 
 ```sh
 pnpm run bundle                                                  # 先构建 lib/client.js

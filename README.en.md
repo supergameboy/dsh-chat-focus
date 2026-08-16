@@ -22,14 +22,20 @@ Implementation: a fork of the host `@deepseek-ai/dsh-client-ui-conversation` (rc
 
 The host ships an official plugin command, `dsh plugin --profile <name> <pnpm args...>` (pnpm forwarding + automatic reconciliation of dependencies that declare `dsh.bundle` into `dsh.profile.bundles`).
 
-One-click script (recommended — backup and verification included):
+From npm (recommended):
+
+```sh
+dsh plugin --profile web add dsh-chat-focus
+```
+
+Local development (one-click script — backup and verification included):
 
 ```sh
 node scripts/install.mjs          # default web profile
 node scripts/install.mjs --profile web --plugin-path E:\dsh-chat-focus
 ```
 
-Equivalent manual steps:
+Equivalent manual steps (local):
 
 ```sh
 pnpm run bundle                                                  # build lib/client.js first
