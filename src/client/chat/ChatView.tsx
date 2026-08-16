@@ -24,8 +24,11 @@ import type { ChatConversationViewNode } from '@deepseek-ai/dsh-client-runtime/c
 import { IconChevronDownOutline14 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ChatViewSlotProps } from '../contract/slots.ts'
 import type { ConversationSettings } from '../../submission-settings.ts'
+import type { AssistantChatData } from '../contract/chat-nodes.ts'
 import { PendingSteeringBubble } from './MessageItem.tsx'
 import { ChatNodeSeat } from './ChatNodeSeat.tsx'
+import { AssistantMarkdown } from './AssistantMarkdown.tsx'
+import { ReasoningRow } from './ReasoningRow.tsx'
 import { buildGroups, type GroupRow } from './grouping/engine.ts'
 import { RuntimeFoldBox } from './bubbles/RuntimeFoldBox.tsx'
 import { ChatBubble } from './bubbles/ChatBubble.tsx'
@@ -164,15 +167,28 @@ function groupKey(group: GroupRow): string {
   return group.kind === 'runtime-run' ? `run:${group.anchorKey}` : group.nodeKey
 }
 
-/** One rendered group row: reply bubble rows, runtime fold box, or plain rows
- *  (the host user row already renders its own bubble chrome). */
-function FocusGroupRow({ group, focus, nodeStore, renderSeat, t }: {
+/** One rendered group row: reply rows split thinking outside the bubble,
+ *  runtime fold box, or plain rows (the host user row renders its own
+ *  bubble chrome). */
+function FocusGroupRow({ group, focus, nodeStore, renderSeat, useSession, loadImage, openFile, fileMentions, t }: {
   group: GroupRow
   focus: ConversationSettings
   nodeStore: { get(key: string): ChatConversationViewNode | undefined }
   renderSeat: (nodeKey: string) => ReactNode
+  useSession: ChatViewSlotProps['useSession']
+  loadImage: ChatViewSlotProps['loadImage']
+  openFile: ChatViewSlotProps['openFile']
+  fileMentions: ChatViewSlotProps['fileMentions']
   t: ChatViewSlotProps['t']
 }) {
+  // Reactive turn tail for the closing message (mirrors AssistantNodeView).
+  const tail = useSession(snapshot => {
+    const location = snapshot.chat.nodes.get(group.kind === 'reply' ? group.nodeKey : '')?.location
+    return location?.kind === 'turn' || location?.kind === 'step'
+      ? location.turn.data.get('turn-tail')
+      : undefined
+  })
+
   if (group.kind === 'runtime-run') {
     return (
       <div
@@ -200,10 +216,45 @@ function FocusGroupRow({ group, focus, nodeStore, renderSeat, t }: {
       </div>
     )
   }
-  const content = renderSeat(group.nodeKey)
-  const time = nodeTime(nodeStore.get(group.nodeKey))
+
+  // Reply: reasoning blocks render outside the bubble (chat-app style Think
+  // rows); the remaining blocks (text/image/tool-call/other) render inside.
+  const node = nodeStore.get(group.nodeKey)
+  const data = node?.data as AssistantChatData | undefined
+  const blocks = data?.blocks ?? []
+  const reasoningBlocks = blocks.filter(block => block.kind === 'reasoning')
+  const bubbleBlocks = blocks.filter(block => block.kind !== 'reasoning')
+  const streaming = data?.status === 'running'
+  const interrupted = data?.status === 'interrupted'
+  const turn = node?.location.kind === 'turn' || node?.location.kind === 'step'
+    ? node.location.turn
+    : undefined
+  const owner = turn?.status === 'closed' && data?.finalNode !== undefined
+    && tail?.closing?.finalNode.seq === data.finalNode.seq
+    ? { turn, seq: data.finalNode.seq, openFile }
+    : undefined
+  const mentions = owner === undefined ? undefined : fileMentions(owner)
+  const time = nodeTime(node)
+  const markdown = (
+    <AssistantMarkdown
+      blocks={bubbleBlocks}
+      streaming={streaming}
+      interrupted={interrupted}
+      loadImage={loadImage}
+      mentions={mentions}
+      t={t}
+    />
+  )
   return (
     <div className={css.flowItem} data-chat-flow-key={group.nodeKey} data-chat-flow-kind={group.kind}>
+      {reasoningBlocks.map((block, index) => (
+        <ReasoningRow
+          key={index}
+          text={block.text}
+          running={streaming && index === reasoningBlocks.length - 1}
+          t={t}
+        />
+      ))}
       {focus.focusBubbles
         ? (
           <ChatBubble
@@ -218,10 +269,10 @@ function FocusGroupRow({ group, focus, nodeStore, renderSeat, t }: {
               bgImage: focus.focusBubbleBgImage,
             }}
           >
-            {content}
+            {markdown}
           </ChatBubble>
         )
-        : content}
+        : markdown}
     </div>
   )
 }
@@ -497,6 +548,10 @@ export function ChatView({
               focus={focus}
               nodeStore={nodeStore}
               renderSeat={renderSeat}
+              useSession={useSession}
+              loadImage={loadImage}
+              openFile={openFile}
+              fileMentions={fileMentions}
               t={t}
             />
           ))}

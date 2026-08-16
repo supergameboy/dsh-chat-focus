@@ -51,6 +51,8 @@ export const FOCUS_BUBBLE_RADIUS_FIELD = 'focusBubbleRadius'
 export const FOCUS_BUBBLE_MAX_WIDTH_FIELD = 'focusBubbleMaxWidth'
 /** Custom assistant-bubble background image (URL or data URI; empty = none). */
 export const FOCUS_BUBBLE_BG_IMAGE_FIELD = 'focusBubbleBgImage'
+/** Bubble template id ('' = none/custom); selecting one fills the custom fields. */
+export const FOCUS_BUBBLE_PRESET_FIELD = 'focusBubblePreset'
 
 /** Defaults shared by the schema, the client scope, and the grouping engine. */
 export const DEFAULT_FOCUS_ENABLED = true
@@ -66,6 +68,7 @@ export const DEFAULT_FOCUS_BUBBLE_BORDER = ''
 export const DEFAULT_FOCUS_BUBBLE_RADIUS = ''
 export const DEFAULT_FOCUS_BUBBLE_MAX_WIDTH = ''
 export const DEFAULT_FOCUS_BUBBLE_BG_IMAGE = ''
+export const DEFAULT_FOCUS_BUBBLE_PRESET = ''
 
 /** Static defaults the client uses while the namespace is loading or unavailable. */
 export const DEFAULT_CONVERSATION_SETTINGS: ConversationSettings = {
@@ -83,6 +86,7 @@ export const DEFAULT_CONVERSATION_SETTINGS: ConversationSettings = {
   focusBubbleRadius: DEFAULT_FOCUS_BUBBLE_RADIUS,
   focusBubbleMaxWidth: DEFAULT_FOCUS_BUBBLE_MAX_WIDTH,
   focusBubbleBgImage: DEFAULT_FOCUS_BUBBLE_BG_IMAGE,
+  focusBubblePreset: DEFAULT_FOCUS_BUBBLE_PRESET,
 }
 
 /** Durable ChatFocus display section. */
@@ -113,6 +117,8 @@ export interface ChatFocusSettings {
   focusBubbleMaxWidth: string
   /** Custom assistant-bubble background image (empty = none). */
   focusBubbleBgImage: string
+  /** Bubble template id (empty = none/custom). */
+  focusBubblePreset: string
 }
 
 /** Durable conversation section shared by the Host schema and the browser scope. */
@@ -137,4 +143,5 @@ export const ConversationSettingsSchema: z<ConversationSettings> = z.object({
   [FOCUS_BUBBLE_RADIUS_FIELD]: z.string().default(DEFAULT_FOCUS_BUBBLE_RADIUS),
   [FOCUS_BUBBLE_MAX_WIDTH_FIELD]: z.string().default(DEFAULT_FOCUS_BUBBLE_MAX_WIDTH),
   [FOCUS_BUBBLE_BG_IMAGE_FIELD]: z.string().default(DEFAULT_FOCUS_BUBBLE_BG_IMAGE),
+  [FOCUS_BUBBLE_PRESET_FIELD]: z.string().default(DEFAULT_FOCUS_BUBBLE_PRESET),
 })

@@ -11,9 +11,76 @@ import type { ConversationSettings } from '../../submission-settings.ts'
 import {
   FOCUS_BUBBLE_STYLES, FOCUS_STRATEGIES, type FocusBubbleStyle, type FocusFoldStrategy,
 } from '../../submission-settings.ts'
+import type { ChatBubbleCustomStyle } from '../chat/bubbles/ChatBubble.tsx'
 import { RuntimeFoldBox, type RuntimeFoldBoxProps } from '../chat/bubbles/RuntimeFoldBox.tsx'
 import { ChatBubble } from '../chat/bubbles/ChatBubble.tsx'
+import type { ConversationKey } from '../locales.ts'
 import css from './ChatFocusSection.module.css'
+
+/** One built-in bubble template: fills the custom fields with one pick. */
+interface BubblePreset {
+  readonly id: string
+  readonly values: ChatBubbleCustomStyle
+}
+
+/** Inline dotted texture for the texture template (no external assets). */
+const TEXTURE_DATA_URI = 'data:image/svg+xml,'
+  + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28">'
+    + '<rect width="28" height="28" fill="#f6f8fb"/>'
+    + '<circle cx="7" cy="7" r="2.5" fill="#dde5f0"/>'
+    + '<circle cx="21" cy="21" r="3" fill="#dde5f0"/></svg>')
+
+/** Built-in bubble templates ('' = theme default). */
+const BUBBLE_PRESETS: readonly BubblePreset[] = [
+  { id: '', values: {} },
+  { id: 'sky', values: { bg: '#e8f1ff', border: '#c9dcff', radius: '14px' } },
+  { id: 'mint', values: { bg: '#e6f7ec', border: '#bfe6cd', radius: '14px' } },
+  {
+    id: 'gradient',
+    values: {
+      bg: 'transparent',
+      bgImage: 'linear-gradient(135deg, #eef2ff 0%, #fdf2f8 100%)',
+      border: '#e0e7ff',
+      radius: '16px',
+    },
+  },
+  { id: 'dark', values: { bg: '#1f2937', border: '#374151', radius: '12px' } },
+  { id: 'texture', values: { bg: 'transparent', bgImage: TEXTURE_DATA_URI, border: '#e5e7eb', radius: '12px' } },
+]
+
+/** Which preset the current custom fields match, or '__custom__'. */
+function activePreset(focus: ConversationSettings): string {
+  const match = BUBBLE_PRESETS.find(preset =>
+    preset.values.bg === focus.focusBubbleBg
+    && (preset.values.border ?? '') === focus.focusBubbleBorder
+    && (preset.values.radius ?? '') === focus.focusBubbleRadius
+    && (preset.values.maxWidth ?? '') === focus.focusBubbleMaxWidth
+    && (preset.values.bgImage ?? '') === focus.focusBubbleBgImage)
+  return match?.id ?? '__custom__'
+}
+
+/** Hex color input plus free-form text input for one color field. */
+function ColorField({ value, onChange }: {
+  value: string
+  onChange: (next: string) => void
+}) {
+  return (
+    <div className={css.colorRow}>
+      <input
+        type="color"
+        className={css.colorPicker}
+        value={/^#[0-9a-fA-F]{6}$/.test(value) ? value : '#dbeafe'}
+        onChange={event => onChange(event.target.value)}
+      />
+      <input
+        type="text"
+        className={css.textInput}
+        value={value}
+        onChange={event => onChange(event.target.value)}
+      />
+    </div>
+  )
+}
 
 /** Injected share: the live settings snapshot (useFocusSettings) and one field write. */
 export interface ChatFocusSectionInjected {
@@ -211,15 +278,44 @@ export const ChatFocusSection = memo(function ChatFocusSection({
           <div className={css.customBlock}>
             <span className={css.customTitle}>{t('focus.customGroup')}</span>
             <Row
+              title={t('focus.preset')}
+              hint={t('focus.presetHint')}
+              control={(
+                <select
+                  className={css.select}
+                  value={activePreset(focus)}
+                  onChange={event => {
+                    const id = event.target.value
+                    if (id === '__custom__') {
+                      setField('focusBubblePreset', '')
+                      return
+                    }
+                    const preset = BUBBLE_PRESETS.find(candidate => candidate.id === id)
+                    if (preset === undefined) return
+                    setField('focusBubblePreset', id)
+                    setField('focusBubbleBg', preset.values.bg ?? '')
+                    setField('focusBubbleBorder', preset.values.border ?? '')
+                    setField('focusBubbleRadius', preset.values.radius ?? '')
+                    setField('focusBubbleMaxWidth', preset.values.maxWidth ?? '')
+                    setField('focusBubbleBgImage', preset.values.bgImage ?? '')
+                  }}
+                >
+                  {BUBBLE_PRESETS.map(preset => (
+                    <option key={preset.id || 'default'} value={preset.id}>
+                      {t((preset.id === '' ? 'focus.preset.default' : `focus.preset.${preset.id}`) as ConversationKey)}
+                    </option>
+                  ))}
+                  <option value="__custom__">{t('focus.preset.custom')}</option>
+                </select>
+              )}
+            />
+            <Row
               title={t('focus.customBg')}
               hint={t('focus.customHint')}
               control={(
-                <input
-                  type="text"
-                  className={css.textInput}
-                  placeholder="#eef4ff"
+                <ColorField
                   value={focus.focusBubbleBg}
-                  onChange={event => setField('focusBubbleBg', event.target.value)}
+                  onChange={next => setField('focusBubbleBg', next)}
                 />
               )}
             />
@@ -227,12 +323,9 @@ export const ChatFocusSection = memo(function ChatFocusSection({
               title={t('focus.customBorder')}
               hint={t('focus.customHint')}
               control={(
-                <input
-                  type="text"
-                  className={css.textInput}
-                  placeholder="#d0d7de"
+                <ColorField
                   value={focus.focusBubbleBorder}
-                  onChange={event => setField('focusBubbleBorder', event.target.value)}
+                  onChange={next => setField('focusBubbleBorder', next)}
                 />
               )}
             />
@@ -279,6 +372,7 @@ export const ChatFocusSection = memo(function ChatFocusSection({
               type="button"
               className={css.resetButton}
               onClick={() => {
+                setField('focusBubblePreset', '')
                 setField('focusBubbleBg', '')
                 setField('focusBubbleBorder', '')
                 setField('focusBubbleRadius', '')

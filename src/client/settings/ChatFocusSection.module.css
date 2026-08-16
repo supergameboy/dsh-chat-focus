@@ -157,6 +157,22 @@
   background: var(--dsw-alias-bg-base);
 }
 
+.colorRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.colorPicker {
+  width: 36px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 6px;
+  background: var(--dsw-alias-bg-base);
+  cursor: pointer;
+}
+
 .resetButton {
   align-self: flex-start;
   border: 1px solid var(--dsw-alias-border-l2);
