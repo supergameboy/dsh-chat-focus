@@ -14,11 +14,53 @@ Implementation: a fork of the host `@deepseek-ai/dsh-client-ui-conversation` (rc
 - **Chat bubbles**: assistant replies render as left-side bubbles (DeepSeek fish logo + HH:MM clock, calendar-aware); the default look mirrors the host user bubble (DeepSeek theme blue, 22px radius); user messages keep the host bubble
 - **Fold summary**: category counts (tools / thinking / other) plus a deduped tool-name list (up to 5); open/closed state persists per run in localStorage (invalidated automatically when the strategy changes); long runs render **windowed** (virtual list, constant render cost)
 - **Deep customization** (Settings → Chat Display → Appearance):
-  - Assistant bubble, 10 knobs: background, border, radius, max width, background image, background fit (cover/contain/stretch), text color, font family, font size, padding (any CSS value)
-  - Background image supports **local upload + crop dialog** (drag/resize frame, canvas export, ≤2MB)
-  - User bubble, 3 knobs: background, text color, font family
+  - Assistant and user bubbles each expose 14 symmetric knobs: background, border, radius, max width, background image, background fit (cover/contain/stretch), text color, font family, font size, padding (any CSS value)
+  - Font presets that exist on both Windows and macOS and differ visibly from the theme default: Follow theme / KaiTi / SimSun / SimHei / Microsoft YaHei (≈ default) / Georgia (serif) / Consolas (mono)
+  - Font-size presets: 12 / 14 / 16 / 18 / 20 / 24px (16px is the theme default)
+  - Background image supports **local upload + crop dialog** (drag/resize frame, canvas export; uploads auto-compressed ≤1200px, ≤2MB); values are wrapped in `url()` automatically so images always render
+  - Gradient editor: enable gradient background (start/end colors + angle); mutually exclusive with the background image (uploading an image turns the gradient off)
   - 6 built-in templates: Default / Sky / Mint / Gradient / Dark / Texture
-  - Live preview: fold box + assistant bubble + user bubble
+  - The assistant/user bubble editors are collapsible, with a per-side **Reset** button
+- **Split settings panel**: grouped controls scroll on top, the live preview (fold box + assistant bubble + user bubble) stays **pinned at the bottom** — visible from any scroll position
+- **Render error boundary**: a crashed row shows an error card instead of blanking the whole conversation; refresh recovers
+
+## Screenshots
+
+| Conversation: folded runtime activity + chat bubbles | Settings: split panel with pinned live preview |
+| --- | --- |
+| ![Conversation](docs/screenshots/conversation.png) | ![Settings](docs/screenshots/settings.png) |
+
+## Settings guide
+
+Open **Settings** (top-right) → **Chat Display**. The panel is split vertically: grouped controls scroll on top, the live preview stays pinned at the bottom.
+
+### Basics
+
+- **Plugin switch**: off restores the original message order (no folding, no bubbles)
+- **Chat bubbles**: text replies render as bubbles; off restores the host rendering
+
+### Folding
+
+- **Recent N replies expanded**: the runtime runs of the most recent N replies render expanded; older runs fold (live streaming activity stays visible)
+- **Fold boxes start expanded**
+- **Fold strategy**: Expand recent N (default) / Threshold (fold once entries exceed N) / Fold all
+- **Reasoning into fold**: text-less thinking steps join the runtime run instead of a separate row
+
+### Appearance
+
+- **Bubble template**: Default / Sky / Mint / Gradient / Dark / Texture — one click, still fine-tunable
+- **Gradient**: enable → start/end colors (color wheel + text) + angle (15° steps); overrides the background image (uploading an image turns it off)
+- **Assistant / User bubble** (collapsible titles, 14 symmetric knobs):
+  - Background, border: color wheel + text input
+  - Radius, max width: preset dropdowns (10/14/18/22px; 480/600/720/840px) or custom
+  - Background image: **Upload** → crop dialog (drag/scale handles + grid, ≤1200px export) → confirm; or paste a URL; **Clear** removes it
+  - Fit: cover / contain / stretch
+  - Text color: color wheel + text input
+  - Font: preset dropdown (Follow theme / KaiTi / SimSun / SimHei / Microsoft YaHei / Georgia / Consolas)
+  - Font size: 12/14/16/18/20/24px (16px is the default — picking it changes nothing visually)
+  - Padding: 6x10 / 10x14 / 14x18px or custom
+  - **Reset**: clears all custom values for that side
+- **Live preview**: fold box + assistant bubble + user bubble samples, updated instantly on every change
 
 ## Install
 
@@ -74,8 +116,9 @@ Settings fields (namespace `ui-conversation`, extended schema; already allowed b
 | focusReasoning | boolean | true | Text-less thinking steps join the runtime run |
 | focusBubbleBg / Border / Radius / MaxWidth / BgImage / BgSize | string | '' / cover | Assistant bubble custom chrome (bg / border / radius / max width / bg image / fit) |
 | focusBubbleTextColor / Font / FontSize / Padding | string | '' | Assistant bubble text custom (color / font / size / padding) |
+| focusBubbleGradientFrom / GradientTo / GradientAngle | string | '' / '' / '135' | Assistant bubble gradient (start/end colors, angle) |
 | focusBubblePreset | string | '' | Bubble template id |
-| focusUserBubbleBg / TextColor / Font | string | '' | User bubble custom (bg / text color / font) |
+| focusUserBubble* (Bg / Border / Radius / MaxWidth / BgImage / BgSize / TextColor / Font / FontSize / Padding / Gradient* / Preset) | string | '' / cover | User bubble custom (14 symmetric knobs) |
 
 ## Build
 
@@ -106,7 +149,7 @@ The host is pre-release (contracts may drift). If adaptation cost exceeds mainte
 
 - The settings preview uses built-in sample data (the section seat is root-scoped; real-session preview is deferred per feedback)
 - Fold-box virtualization uses an estimated row height (fixed 56px spacing); measured row-height calibration is v0.3 work
-- The user bubble is host-rendered; background/text color/font are customizable via CSS-variable inheritance, while host-fixed values (radius, font size) are not adjustable yet
+- Font presets rely on system fonts: KaiTi/SimSun/SimHei ship with Windows and macOS but may be missing on Linux (falls back to the system default)
 
 ## License
 

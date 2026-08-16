@@ -5,6 +5,36 @@
   flex-direction: column;
   gap: 12px;
   padding: 16px 0;
+  /* Height is measured from the host scroll pane at runtime (the slot has no
+     percentage-height contract); border-box keeps the measured pane height
+     from overflowing by the padding. */
+  box-sizing: border-box;
+  min-height: 0;
+}
+
+/* Scrollable control pane: the grouped panels live here. */
+.settingsScroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-right: 2px;
+}
+
+/* Fixed bottom pane: the live sample is always visible while the controls
+   above scroll. */
+.previewPane {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px dashed var(--dsw-alias-border-l2);
+  border-radius: 10px;
+  background: var(--dsw-alias-bg-layer-1);
+  box-shadow: 0 -6px 18px rgba(15, 23, 42, 0.12);
 }
 
 .header {
@@ -38,6 +68,9 @@
   border-radius: 8px;
   background: var(--dsw-alias-bg-layer-1);
   overflow: hidden;
+  /* Never shrink inside the scroll pane: the pane scrolls, the groups keep
+     their natural height. */
+  flex-shrink: 0;
 }
 
 .groupSummary {
@@ -125,15 +158,6 @@
   background: var(--dsw-alias-bg-base);
 }
 
-.previewWrap {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 10px 0 4px;
-  border-top: 1px dashed var(--dsw-alias-border-l2);
-  margin-top: 6px;
-}
-
 .customBlock {
   display: flex;
   flex-direction: column;
@@ -144,6 +168,7 @@
 }
 
 .sideBlock {
+  /* Collapsible per-side editor: summary title + the row list beneath it. */
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -156,6 +181,8 @@
   font: var(--dsw-font-s-strong-14);
   color: var(--dsw-alias-label-primary);
   padding-bottom: 4px;
+  cursor: pointer;
+  user-select: none;
 }
 
 .gradientBox {

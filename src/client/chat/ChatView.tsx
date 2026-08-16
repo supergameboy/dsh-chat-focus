@@ -17,7 +17,7 @@
 // ChatNodeSeat subscribes to one Node key, so Assistant deltas and Tool
 // lifecycle updates replace only their own row without remounting it.
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { Component, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
 import type { ConversationTimelineSnapshot } from '@deepseek-ai/dsh-client-runtime/client'
 import type { ChatConversationViewNode } from '@deepseek-ai/dsh-client-runtime/client'
@@ -33,7 +33,7 @@ import { AssistantMarkdown } from './AssistantMarkdown.tsx'
 import { ReasoningRow } from './ReasoningRow.tsx'
 import { buildGroups, type GroupRow } from './grouping/engine.ts'
 import { RuntimeFoldBox } from './bubbles/RuntimeFoldBox.tsx'
-import { ChatBubble } from './bubbles/ChatBubble.tsx'
+import { ChatBubble, bgImageCssValue } from './bubbles/ChatBubble.tsx'
 import { formatRunDuration } from './message-chrome.ts'
 import css from './ChatView.module.css'
 
@@ -96,7 +96,7 @@ function userBubbleVars(side: BubbleSideFields): Record<string, string> {
   set('--cf-user-bubble-border', custom.border)
   set('--cf-user-bubble-radius', custom.radius)
   set('--cf-user-bubble-max-width', custom.maxWidth)
-  set('--cf-user-bubble-bg-image', custom.bgImage)
+  set('--cf-user-bubble-bg-image', custom.bgImage === undefined ? undefined : bgImageCssValue(custom.bgImage))
   set('--cf-user-bubble-bg-size', custom.bgSize === 'stretch' ? '100% 100%' : custom.bgSize)
   set('--cf-user-bubble-text-color', custom.textColor)
   set('--cf-user-bubble-font', custom.font)
@@ -226,6 +226,29 @@ function groupKey(group: GroupRow): string {
   return group.kind === 'runtime-run' ? `run:${group.anchorKey}` : group.nodeKey
 }
 
+/** Render-error boundary: a crashed row must never blank the whole view —
+ *  show a recoverable card instead so the failure stays visible and the
+ *  user can hand it back instead of guessing at a white pane. */
+class ChatViewErrorBoundary extends Component<{
+  t: ChatViewSlotProps['t']
+  children: ReactNode
+}, { error: Error | null }> {
+  override state: { error: Error | null } = { error: null }
+
+  static getDerivedStateFromError(error: Error): { error: Error | null } {
+    return { error }
+  }
+
+  override render(): ReactNode {
+    if (this.state.error === null) return this.props.children
+    return (
+      <div className={css.openError} role="alert">
+        {this.props.t('chat.renderError', { message: this.state.error.message })}
+      </div>
+    )
+  }
+}
+
 /** One rendered group row: reply rows split thinking outside the bubble,
  *  runtime fold box, or plain rows (the host user row renders its own
  *  bubble chrome). */
@@ -243,9 +266,9 @@ function FocusGroupRow({ group, focus, nodeStore, renderSeat, useSession, loadIm
   // Reactive turn tail for the closing message (mirrors AssistantNodeView).
   const tail = useSession(snapshot => {
     const location = snapshot.chat.nodes.get(group.kind === 'reply' ? group.nodeKey : '')?.location
-    return location?.kind === 'turn' || location?.kind === 'step'
-      ? location.turn.data.get('turn-tail')
-      : undefined
+    if (location === undefined) return undefined
+    if (location.kind !== 'turn' && location.kind !== 'step') return undefined
+    return location.turn?.data.get('turn-tail')
   })
 
   if (group.kind === 'runtime-run') {
@@ -623,63 +646,65 @@ export function ChatView({
   )
 
   return (
-    <div className={css.root}>
-      <div ref={listRef} className={css.scroll}>
-        <div ref={columnRef} className={css.column} data-chat-flow="">
-          {openState === 'loading' && <div className={css.hint}>{t('chat.loadingHistory')}</div>}
-          {openState === 'error' && openError !== null && (
-            <div className={css.openError}>
-              {t('chat.loadError', { message: openError.message, code: openError.code })}
-            </div>
-          )}
-          {hasMore && (
-            <div className={css.older}>
-              <button type="button" disabled={loadingOlder} onClick={loadOlderAnchored}>
-                {loadingOlder ? t('loading') : t('chat.loadOlder')}
+    <ChatViewErrorBoundary t={t}>
+      <div className={css.root}>
+        <div ref={listRef} className={css.scroll}>
+          <div ref={columnRef} className={css.column} data-chat-flow="">
+            {openState === 'loading' && <div className={css.hint}>{t('chat.loadingHistory')}</div>}
+            {openState === 'error' && openError !== null && (
+              <div className={css.openError}>
+                {t('chat.loadError', { message: openError.message, code: openError.code })}
+              </div>
+            )}
+            {hasMore && (
+              <div className={css.older}>
+                <button type="button" disabled={loadingOlder} onClick={loadOlderAnchored}>
+                  {loadingOlder ? t('loading') : t('chat.loadOlder')}
+                </button>
+              </div>
+            )}
+            {groups.map(group => (
+              <FocusGroupRow
+                key={`${groupKey(group)}:${focus.focusStrategy}:${focus.focusKeepVisible}`}
+                group={group}
+                focus={focus}
+                nodeStore={nodeStore}
+                renderSeat={renderSeat}
+                useSession={useSession}
+                loadImage={loadImage}
+                openFile={openFile}
+                fileMentions={fileMentions}
+                t={t}
+              />
+            ))}
+            {/* No pending placeholders: questions (ui-user-questions) and approvals
+                (ApprovalPanel) both take over the composer, so a flow card would
+                double-render the same wait. */}
+            {/* Turn-level loading signal: rides the whole running turn (first-token
+                wait, tool execution, streaming) so it never flickers per step. */}
+            {running && <TurnStatus startTime={runningTurnStart} t={t} />}
+            {pendingSteering.map(item => (
+              <PendingSteeringBubble key={item.id} content={item.content} loadImage={loadImage} t={t} />
+            ))}
+          </div>
+          {!atBottom && (
+            <div className={css.toBottomSlot}>
+              <button
+                type="button"
+                className={css.toBottom}
+                aria-label={t('chat.toBottom')}
+                onClick={() => {
+                  const local = listRef.current
+                  /* v8 ignore next -- ref-null guard: the button only renders alongside the mounted list. */
+                  if (local !== null) toBottom(scrollerOf(local))
+                }}
+              >
+                <IconChevronDownOutline14 />
               </button>
             </div>
           )}
-          {groups.map(group => (
-            <FocusGroupRow
-              key={`${groupKey(group)}:${focus.focusStrategy}:${focus.focusKeepVisible}`}
-              group={group}
-              focus={focus}
-              nodeStore={nodeStore}
-              renderSeat={renderSeat}
-              useSession={useSession}
-              loadImage={loadImage}
-              openFile={openFile}
-              fileMentions={fileMentions}
-              t={t}
-            />
-          ))}
-          {/* No pending placeholders: questions (ui-user-questions) and approvals
-              (ApprovalPanel) both take over the composer, so a flow card would
-              double-render the same wait. */}
-          {/* Turn-level loading signal: rides the whole running turn (first-token
-              wait, tool execution, streaming) so it never flickers per step. */}
-          {running && <TurnStatus startTime={runningTurnStart} t={t} />}
-          {pendingSteering.map(item => (
-            <PendingSteeringBubble key={item.id} content={item.content} loadImage={loadImage} t={t} />
-          ))}
         </div>
-        {!atBottom && (
-          <div className={css.toBottomSlot}>
-            <button
-              type="button"
-              className={css.toBottom}
-              aria-label={t('chat.toBottom')}
-              onClick={() => {
-                const local = listRef.current
-                /* v8 ignore next -- ref-null guard: the button only renders alongside the mounted list. */
-                if (local !== null) toBottom(scrollerOf(local))
-              }}
-            >
-              <IconChevronDownOutline14 />
-            </button>
-          </div>
-        )}
       </div>
-    </div>
+    </ChatViewErrorBoundary>
   )
 }

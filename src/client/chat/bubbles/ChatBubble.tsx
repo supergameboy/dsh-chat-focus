@@ -35,7 +35,7 @@ export interface ChatBubbleCustomStyle {
   readonly radius?: string
   /** CSS length for the bubble max width. */
   readonly maxWidth?: string
-  /** Background image URL or data URI. */
+  /** Background image URL or data URI (also accepts gradient functions). */
   readonly bgImage?: string
   /** Background-image fit: cover | contain | stretch (100% 100%). */
   readonly bgSize?: 'cover' | 'contain' | 'stretch'
@@ -47,6 +47,18 @@ export interface ChatBubbleCustomStyle {
   readonly fontSize?: string
   /** CSS padding shorthand for the bubble content box. */
   readonly padding?: string
+}
+
+/** Build a valid CSS value for `background-image`: URLs and data URIs must be
+ *  wrapped in url(); gradient functions are used as-is. */
+export function bgImageCssValue(value: string): string {
+  const trimmed = value.trim()
+  if (trimmed.startsWith('url(')) return value
+  if (trimmed.startsWith('data:') || trimmed.startsWith('http://')
+    || trimmed.startsWith('https://') || trimmed.startsWith('/')) {
+    return `url("${value.replace(/"/g, '\\"')}")`
+  }
+  return value
 }
 
 /** Full props of one bubble row. */
@@ -75,7 +87,9 @@ export const ChatBubble = memo(function ChatBubble({
       customVars['--cf-bubble-radius'] = custom.radius
       customVars['--cf-bubble-corner'] = custom.radius
     }
-    if (custom.bgImage !== undefined && custom.bgImage !== '') customVars['--cf-bubble-bg-image'] = custom.bgImage
+    if (custom.bgImage !== undefined && custom.bgImage !== '') {
+      customVars['--cf-bubble-bg-image'] = bgImageCssValue(custom.bgImage)
+    }
     if (custom.bgSize !== undefined) {
       customVars['--cf-bubble-bg-size'] = custom.bgSize === 'stretch' ? '100% 100%' : custom.bgSize
     }

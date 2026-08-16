@@ -3,7 +3,7 @@
 // fold box and bubble chrome (frozen sample data; the section seat is
 // root-scoped, so real session data needs a v0.2 inject channel).
 
-import { memo, useRef, useState } from 'react'
+import { memo, useLayoutEffect, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import type { ObservableSnapshot } from '@deepseek-ai/dsh-client-runtime/client'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
@@ -16,7 +16,7 @@ import {
 } from '../../submission-settings.ts'
 import type { ChatBubbleCustomStyle } from '../chat/bubbles/ChatBubble.tsx'
 import { RuntimeFoldBox, type RuntimeFoldBoxProps } from '../chat/bubbles/RuntimeFoldBox.tsx'
-import { ChatBubble } from '../chat/bubbles/ChatBubble.tsx'
+import { ChatBubble, bgImageCssValue } from '../chat/bubbles/ChatBubble.tsx'
 import { ImageCropper, compressImageDataUrl } from './ImageCropper.tsx'
 import type { ConversationKey } from '../locales.ts'
 import css from './ChatFocusSection.module.css'
@@ -86,7 +86,7 @@ function previewUserStyle(focus: ConversationSettings): CSSProperties {
   set('border', custom.border !== '' ? `1px solid ${custom.border}` : '')
   set('borderRadius', custom.radius)
   set('maxWidth', custom.maxWidth)
-  set('backgroundImage', custom.bgImage)
+  set('backgroundImage', custom.bgImage === undefined ? undefined : bgImageCssValue(custom.bgImage))
   set('backgroundSize', custom.bgSize === 'stretch' ? '100% 100%' : custom.bgSize)
   set('color', custom.textColor)
   set('fontFamily', custom.font)
@@ -183,19 +183,21 @@ function Checkbox({ checked, onChange, label }: {
   )
 }
 
-/** Available font presets (system stacks; '' follows the theme). */
+/** Available font presets (system stacks; '' follows the theme). The stacks
+ *  pick fonts that exist on both Windows and macOS and differ visibly from
+ *  the theme default, so picking one produces an immediate visual change. */
 const FONT_PRESETS: readonly { id: string; value: string }[] = [
   { id: 'default', value: '' },
-  { id: 'pingfang', value: "'PingFang SC', 'Microsoft YaHei', sans-serif" },
+  { id: 'kaiti', value: "'KaiTi', 'STKaiti', serif" },
+  { id: 'simsun', value: "'SimSun', 'Songti SC', serif" },
+  { id: 'simhei', value: "'SimHei', 'Heiti SC', sans-serif" },
   { id: 'yahei', value: "'Microsoft YaHei', 'PingFang SC', sans-serif" },
-  { id: 'noto', value: "'Noto Sans SC', 'PingFang SC', sans-serif" },
-  { id: 'helvetica', value: "'Helvetica Neue', Arial, sans-serif" },
   { id: 'serif', value: "Georgia, 'Times New Roman', serif" },
   { id: 'mono', value: "Consolas, 'Courier New', monospace" },
 ]
 
-/** Font size presets. */
-const FONT_SIZE_PRESETS = ['', '12px', '13px', '14px', '15px', '16px', '18px']
+/** Font size presets (16px is the theme default; larger steps make changes obvious). */
+const FONT_SIZE_PRESETS = ['', '12px', '14px', '16px', '18px', '20px', '24px']
 /** Padding presets. */
 const PADDING_PRESETS = ['', '6px 10px', '10px 14px', '14px 18px']
 
@@ -380,10 +382,10 @@ function BubbleSideEditor({ side, focus, setField, t }: {
   const set = (suffix: string, next: unknown): void => setField(field(suffix), next)
 
   return (
-    <div className={css.sideBlock}>
-      <span className={css.sideTitle}>
+    <details className={css.sideBlock} open>
+      <summary className={css.sideTitle}>
         {t(side === 'assistant' ? 'focus.sideAssistant' : 'focus.sideUser')}
-      </span>
+      </summary>
       <Row
         title={t('focus.preset')}
         hint={t('focus.presetHint')}
@@ -563,7 +565,7 @@ function BubbleSideEditor({ side, focus, setField, t }: {
       >
         {t('focus.customReset')}
       </button>
-    </div>
+    </details>
   )
 }
 
@@ -575,14 +577,44 @@ export const ChatFocusSection = memo(function ChatFocusSection({
   const setField = (field: keyof ConversationSettings, value: unknown): void => {
     setFocusField(field, value)
   }
+  const rootRef = useRef<HTMLDivElement | null>(null)
+  // The settings slot renders inside a host scroll pane whose height chain
+  // has no 100% contract, so measure the nearest scroll ancestor and pin the
+  // pane height to it: controls scroll above, the preview stays fixed below.
+  const [paneHeight, setPaneHeight] = useState<number | null>(null)
+  useLayoutEffect(() => {
+    const el = rootRef.current
+    if (el === null) return
+    let scroller: HTMLElement | null = el.parentElement
+    while (scroller !== null && scroller !== document.body) {
+      const overflow = getComputedStyle(scroller).overflowY
+      if (overflow === 'auto' || overflow === 'scroll') break
+      scroller = scroller.parentElement
+    }
+    if (scroller === null || scroller === document.body) return
+    const measure = (): void => setPaneHeight(scroller.clientHeight)
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(scroller)
+    return () => { observer.disconnect() }
+  }, [])
 
   return (
-    <div className={css.root} role="tabpanel" aria-label={t('focus.sectionLabel')}>
+    <div
+      ref={rootRef}
+      className={css.root}
+      role="tabpanel"
+      aria-label={t('focus.sectionLabel')}
+      style={paneHeight === null ? undefined : { height: paneHeight }}
+    >
       <div className={css.header}>
         <span className={css.headerTitle}>{t('focus.sectionLabel')}</span>
         <button type="button" className={css.close} onClick={close}>{t('details.close')}</button>
       </div>
 
+      {/* Top pane scrolls the grouped controls; the live sample below stays
+          fixed at the bottom so every bubble-field edit stays visible. */}
+      <div className={css.settingsScroll}>
       <details className={css.group} open>
         <summary className={css.groupSummary}>{t('focus.basicGroup')}</summary>
         <div className={css.groupBody}>
@@ -702,34 +734,38 @@ export const ChatFocusSection = memo(function ChatFocusSection({
           />
           <BubbleSideEditor side="assistant" focus={focus} setField={setField} t={t} />
           <BubbleSideEditor side="user" focus={focus} setField={setField} t={t} />
-          <div className={css.previewWrap}>
-            <span className={css.previewLabel}>{t('focus.preview')} · {t('focus.previewExample')}</span>
-            <RuntimeFoldBox
-              {...PREVIEW_RUN}
-              defaultOpen={focus.focusDefaultOpen}
-              summaryVisible={focus.focusSummary}
-              t={t}
-              renderItem={item => item.kind === 'reasoning'
-                ? <div className={css.previewThink}>{item.text}</div>
-                : <PreviewNode key={item.nodeKey} label={item.nodeKey === 'preview-1' ? 'read' : 'glob'} />}
-            />
-            <ChatBubble
-              role="assistant"
-              compact={focus.focusBubbleStyle === 'compact'}
-              time={Date.now()}
-              custom={previewCustom(focus, 'assistant')}
-            >
-              <div className={css.previewReply}>这是正式回复示例文本。</div>
-            </ChatBubble>
-            <div className={css.previewUserWrap}>
-              <span className={css.previewLabel}>{t('focus.previewUser')}</span>
-              <div className={css.previewUserBubble} style={previewUserStyle(focus)}>
-                这是用户消息示例。
-              </div>
-            </div>
-          </div>
         </div>
       </details>
+      </div>
+
+      {/* Fixed bottom pane: the live sample stays pinned while the controls
+          above scroll. */}
+      <div className={css.previewPane}>
+        <span className={css.previewLabel}>{t('focus.preview')} · {t('focus.previewExample')}</span>
+        <RuntimeFoldBox
+          {...PREVIEW_RUN}
+          defaultOpen={focus.focusDefaultOpen}
+          summaryVisible={focus.focusSummary}
+          t={t}
+          renderItem={item => item.kind === 'reasoning'
+            ? <div className={css.previewThink}>{item.text}</div>
+            : <PreviewNode key={item.nodeKey} label={item.nodeKey === 'preview-1' ? 'read' : 'glob'} />}
+        />
+        <ChatBubble
+          role="assistant"
+          compact={focus.focusBubbleStyle === 'compact'}
+          time={Date.now()}
+          custom={previewCustom(focus, 'assistant')}
+        >
+          <div className={css.previewReply}>这是正式回复示例文本。</div>
+        </ChatBubble>
+        <div className={css.previewUserWrap}>
+          <span className={css.previewLabel}>{t('focus.previewUser')}</span>
+          <div className={css.previewUserBubble} style={previewUserStyle(focus)}>
+            这是用户消息示例。
+          </div>
+        </div>
+      </div>
     </div>
   )
 })
