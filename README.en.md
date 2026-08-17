@@ -110,16 +110,16 @@ Once the bundle layer is gone, the host `ui-conversation` row restores automatic
 
 Known conflict: **after switching a skin, the host fails to boot** with `failed to parse overlay .../cordis.patch.yml: YAMLException: end of the stream or a document separator is expected`.
 
-Cause: the skin manager (`dsh-client-ui-skin-center`) of `@linxin666/dsh-web-ui-all` appends its skin rows **after the template's `[]` placeholder** in the profile boot patch — a flow sequence cannot be followed by top-level rows, so the YAML fails to parse (unrelated to dsh-chat-focus; any profile hits it).
+Cause: the profile boot patch template ships with a bare `[]` placeholder; the skin manager (`dsh-client-ui-skin-center`) appends its rows after it — a YAML flow sequence cannot be followed by top-level rows, so parsing fails. The skin manager works fine on any placeholder-free patch file (unrelated to dsh-chat-focus; any profile hits it).
 
-Fix (one-time, idempotent; re-run after upgrading web-ui-all):
+Fix (one-time, idempotent; **does not modify third-party code**, unaffected by web-ui-all upgrades):
 
 ```sh
 node scripts/patch-skin-center.mjs          # default web profile
 node scripts/patch-skin-center.mjs --profile web
 ```
 
-The script strips the template `[]` placeholder before the skin rows are appended (automatic `.bak` backup). **Restart dsh web afterwards.**
+The script removes the `[]` placeholder from the profile patch file (automatic `.bak` backup). **Restart dsh web afterwards** — skin switching then writes valid YAML and the skin feature works normally.
 
 ## Configuration
 

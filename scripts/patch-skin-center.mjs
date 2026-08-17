@@ -1,27 +1,28 @@
 #!/usr/bin/env node
 /**
- * Fix the @linxin666/dsh-web-ui-all skin switcher writing invalid YAML into
- * the profile boot patch (cordis.patch.yml).
+ * Fix the dsh-web-ui-all skin switcher's boot failure without touching the
+ * third-party package.
  *
- * Symptom: after switching skins in the GUI, the host fails to boot with
+ * Symptom: after switching skins, the host fails to boot with
  * "failed to parse overlay .../cordis.patch.yml: YAMLException: end of the
- * stream or a document separator is expected (7:1)" — the skin-center
- * `useSkin` appends its managed rows right after the template's `[]`
- * placeholder, and a flow sequence cannot be followed by top-level rows.
+ * stream or a document separator is expected (7:1)".
  *
- * Fix: make `useSkin` strip the standalone `[]` placeholder line before
- * appending the managed skin section. Idempotent: a package already patched
- * is left untouched. Re-run after upgrading @linxin666/dsh-web-ui-all.
+ * Why: the profile boot patch template ships with a bare `[]` placeholder.
+ * The skin manager (dsh-client-ui-skin-center) appends its rows after the
+ * placeholder, and a YAML flow sequence cannot be followed by top-level
+ * rows. The skin manager itself works fine on any placeholder-free patch
+ * file, so the clean fix is to remove the placeholder once from the profile
+ * file — no third-party code is modified, and upgrading @linxin666/dsh-web-
+ * ui-all does not revert it.
+ *
+ * Idempotent: a patch file already free of the placeholder is left as is.
+ * Re-run if a fresh profile was created.
  *
  * Usage: node scripts/patch-skin-center.mjs [--profile web]
  */
 import { copyFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
-
-const TARGET_REL = join('node_modules', '@linxin666', 'dsh-client-ui-skin-center', 'lib', 'index.js')
-const OLD_LINE = 'const patch = stripLegacySkinRows(stripManaged(readPatch(paths.patchPath)));'
-const NEW_LINE = 'const patch = stripLegacySkinRows(stripManaged(readPatch(paths.patchPath))).replace(/^\\s*\\[\\]\\s*$/gm, "");'
 
 function parseArgs(argv) {
   const options = { profile: 'web', help: false }
@@ -46,23 +47,20 @@ if (!/^[a-z0-9-]+$/.test(profile)) {
   throw new Error(`invalid profile name: ${profile}`)
 }
 
-const target = join(homedir(), '.dsh', 'profiles', profile, TARGET_REL)
+const target = join(homedir(), '.dsh', 'profiles', profile, 'cordis.patch.yml')
 if (!existsSync(target)) {
-  process.stderr.write(`not found: ${target} — is @linxin666/dsh-web-ui-all installed in profile '${profile}'?\n`)
+  process.stderr.write(`not found: ${target}\n`)
   process.exit(1)
 }
 
 const source = readFileSync(target, 'utf8')
-if (source.includes(NEW_LINE)) {
-  process.stdout.write(`already patched: ${target}\n`)
+const next = source.replace(/^\s*\[\]\s*$/gm, '')
+if (next === source) {
+  process.stdout.write(`already fixed: ${target} (no \`[]\` placeholder)\n`)
   process.exit(0)
-}
-if (!source.includes(OLD_LINE)) {
-  process.stderr.write(`unexpected source in ${target} — the upstream writer changed; please re-check\n`)
-  process.exit(1)
 }
 
 copyFileSync(target, `${target}.bak`)
-writeFileSync(target, source.replace(OLD_LINE, NEW_LINE), 'utf8')
-process.stdout.write(`patched ${target} (backup: ${target}.bak)\n`)
-process.stdout.write(`Restart the dsh web service for the fix to load.\n`)
+writeFileSync(target, next, 'utf8')
+process.stdout.write(`fixed ${target} (backup: ${target}.bak) — removed the \`[]\` placeholder\n`)
+process.stdout.write(`No third-party code was modified; skin switching now produces valid YAML.\n`)

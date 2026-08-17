@@ -78,16 +78,16 @@ node scripts/uninstall.mjs --clean-settings  # 同时清理 settings.yaml 的 fo
 
 已知冲突：**切换皮肤后宿主启动报错** `failed to parse overlay .../cordis.patch.yml: YAMLException: end of the stream or a document separator is expected`。
 
-原因：`@linxin666/dsh-web-ui-all` 的皮肤管理（`dsh-client-ui-skin-center`）把皮肤行**追加到 profile 补丁模板的 `[]` 占位之后**——flow 序列后面不能跟顶层行，YAML 解析失败（与 dsh-chat-focus 无关，任何 profile 都会触发）。
+原因：profile 启动补丁模板自带一个 `[]` 占位；皮肤管理（`dsh-client-ui-skin-center`）把皮肤行**追加**到占位之后——YAML flow 序列后面不能跟顶层行，解析失败。皮肤管理器本身对"无占位的补丁文件"完全正常（与 dsh-chat-focus 无关，任何 profile 都会触发）。
 
-修复（一次性，幂等；升级 web-ui-all 后需重跑）：
+修复（一次性，幂等；**不修改第三方包**，升级 web-ui-all 不受影响）：
 
 ```sh
 node scripts/patch-skin-center.mjs          # 默认 web profile
 node scripts/patch-skin-center.mjs --profile web
 ```
 
-脚本让皮肤切换写入前剥离模板 `[]` 占位（自动备份 `.bak`）。**修改后需重启 dsh web**。
+脚本移除 profile 补丁文件里的 `[]` 占位（自动备份 `.bak`）。**修改后需重启 dsh web**——之后皮肤切换写入的都是合法 YAML，皮肤功能正常。
 
 ## 设置说明
 
