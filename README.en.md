@@ -91,14 +91,35 @@ The bundle's patch layer (`cordis.patch.yml`) is applied by the loader automatic
 
 ## Uninstall
 
+Official command (recommended):
+
 ```sh
-node scripts/uninstall.mjs                 # keep harmless settings leftovers
+dsh plugin --profile web remove dsh-chat-focus   # removes the dependency + bundle layer; the host ui-conversation row restores after restart
+```
+
+One-click script (cross-platform node, with backup, residue checks and optional settings cleanup):
+
+```sh
+node scripts/uninstall.mjs                 # runs `dsh plugin --profile web remove dsh-chat-focus` internally; keeps harmless settings leftovers
 node scripts/uninstall.mjs --clean-settings  # also remove focus* fields from settings.yaml
 ```
 
-Equivalent manual step: `dsh plugin --profile web remove dsh-chat-focus` + restart.
-
 Once the bundle layer is gone, the host `ui-conversation` row restores automatically (patch-layer semantics: a layer that is not applied leaves the host row). Harmless leftovers: `focus*` fields under the `ui-conversation` namespace in the settings file (the host schema ignores unknown keys; `--clean-settings` removes them) and `dsh.chat-focus.fold.*` localStorage keys (browser-side). Session records are untouched — the plugin only renders UI.
+
+## Coexistence with dsh-web-ui-all (skins)
+
+Known conflict: **after switching a skin, the host fails to boot** with `failed to parse overlay .../cordis.patch.yml: YAMLException: end of the stream or a document separator is expected`.
+
+Cause: the skin manager (`dsh-client-ui-skin-center`) of `@linxin666/dsh-web-ui-all` appends its skin rows **after the template's `[]` placeholder** in the profile boot patch — a flow sequence cannot be followed by top-level rows, so the YAML fails to parse (unrelated to dsh-chat-focus; any profile hits it).
+
+Fix (one-time, idempotent; re-run after upgrading web-ui-all):
+
+```sh
+node scripts/patch-skin-center.mjs          # default web profile
+node scripts/patch-skin-center.mjs --profile web
+```
+
+The script strips the template `[]` placeholder before the skin rows are appended (automatic `.bak` backup). **Restart dsh web afterwards.**
 
 ## Configuration
 

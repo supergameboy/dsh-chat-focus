@@ -59,14 +59,35 @@ bundle 的 patch 层（`cordis.patch.yml`）由 loader 自动应用：宿主 `ui
 
 ## 卸载
 
+官方命令形式（推荐）：
+
 ```sh
-node scripts/uninstall.mjs                 # 保留设置字段残留（无害）
+dsh plugin --profile web remove dsh-chat-focus   # 移除依赖 + bundle 层，重启后宿主 ui-conversation 行自动恢复
+```
+
+一键脚本（node 全平台，含备份、残留校验与可选设置清理）：
+
+```sh
+node scripts/uninstall.mjs                 # 内部即执行 dsh plugin --profile web remove dsh-chat-focus；保留设置字段残留（无害）
 node scripts/uninstall.mjs --clean-settings  # 同时清理 settings.yaml 的 focus* 字段
 ```
 
-等价手动步骤：`dsh plugin --profile web remove dsh-chat-focus` + 重启。
-
 移除 bundle 层后，宿主 `ui-conversation` 行自动恢复（补丁层机制：层不应用即回到宿主行）。残留（均无害）：设置文件 `ui-conversation` 命名空间中的 focus 字段（宿主 schema 放行未知键，`--clean-settings` 可清理）；localStorage `dsh.chat-focus.fold.*`（浏览器端）。会话记录零污染（插件仅 UI 渲染，不写 session log）。
+
+## 与 dsh-web-ui-all（皮肤）共存
+
+已知冲突：**切换皮肤后宿主启动报错** `failed to parse overlay .../cordis.patch.yml: YAMLException: end of the stream or a document separator is expected`。
+
+原因：`@linxin666/dsh-web-ui-all` 的皮肤管理（`dsh-client-ui-skin-center`）把皮肤行**追加到 profile 补丁模板的 `[]` 占位之后**——flow 序列后面不能跟顶层行，YAML 解析失败（与 dsh-chat-focus 无关，任何 profile 都会触发）。
+
+修复（一次性，幂等；升级 web-ui-all 后需重跑）：
+
+```sh
+node scripts/patch-skin-center.mjs          # 默认 web profile
+node scripts/patch-skin-center.mjs --profile web
+```
+
+脚本让皮肤切换写入前剥离模板 `[]` 占位（自动备份 `.bak`）。**修改后需重启 dsh web**。
 
 ## 设置说明
 
