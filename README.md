@@ -57,6 +57,8 @@ dsh plugin --profile web add "link:E:\dsh-chat-focus"            # 安装并自�
 
 bundle 的 patch 层（`cordis.patch.yml`）由 loader 自动应用：宿主 `ui-conversation` 行被禁用，`chat-focus` 行挂载 fork；其他宿主插件（ui-tool、ui-plan、ui-commands 等）注册进 fork 声明的同名槽位，功能不变。
 
+**注意：安装之后需要重启dsh**
+
 ## 卸载
 
 官方命令形式（推荐）：
