@@ -82,6 +82,8 @@ dsh plugin --profile web add "link:E:\dsh-chat-focus"            # official comm
 
 The bundle's patch layer (`cordis.patch.yml`) is applied by the loader automatically: the host `ui-conversation` row is disabled and the `chat-focus` row mounts the fork; all other host plugins (ui-tool, ui-plan, ui-commands, …) keep registering into the fork's identically-named slots.
 
+**Note: restart dsh after installing.**
+
 ## Uninstall
 
 The official command only:
