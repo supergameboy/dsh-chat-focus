@@ -64,7 +64,7 @@ Open **Settings** (top-right) → **Chat Display**. The panel is split verticall
 
 ## Install
 
-The host ships an official plugin command, `dsh plugin --profile <name> <pnpm args...>` (pnpm forwarding + automatic reconciliation of dependencies that declare `dsh.bundle` into `dsh.profile.bundles`).
+Always use the host's official plugin command, `dsh plugin --profile <name> <pnpm args...>` (pnpm forwarding + automatic reconciliation of dependencies that declare `dsh.bundle` into `dsh.profile.bundles`). This project ships no wrapper scripts and needs none.
 
 From npm (recommended):
 
@@ -72,18 +72,11 @@ From npm (recommended):
 dsh plugin --profile web add dsh-chat-focus
 ```
 
-Local development (one-click script — backup and verification included):
-
-```sh
-node scripts/install.mjs          # default web profile
-node scripts/install.mjs --profile web --plugin-path E:\dsh-chat-focus
-```
-
-Equivalent manual steps (local):
+Local development (official command against the local checkout):
 
 ```sh
 pnpm run bundle                                                  # build lib/client.js first
-dsh plugin --profile web add "link:E:\dsh-chat-focus"            # install + auto bundle layer
+dsh plugin --profile web add "link:E:\dsh-chat-focus"            # official command, auto bundle layer
 # restart dsh web
 ```
 
@@ -91,20 +84,24 @@ The bundle's patch layer (`cordis.patch.yml`) is applied by the loader automatic
 
 ## Uninstall
 
-Official command (recommended):
+The official command only:
 
 ```sh
 dsh plugin --profile web remove dsh-chat-focus   # removes the dependency + bundle layer; the host ui-conversation row restores after restart
 ```
 
-One-click script (cross-platform node, with backup, residue checks and optional settings cleanup):
+Two optional MANUAL cleanups afterwards (both inert leftovers; your call):
 
-```sh
-node scripts/uninstall.mjs                 # runs `dsh plugin --profile web remove dsh-chat-focus` internally; keeps harmless settings leftovers
-node scripts/uninstall.mjs --clean-settings  # also remove focus* fields from settings.yaml
+```powershell
+# 1) node_modules directory link left ONLY by `link:` installs (the loader never reads it):
+Remove-Item C:\Users\super\.dsh\profiles\web\node_modules\dsh-chat-focus -Force -Recurse
+
+# 2) the focus* customization fields under settings.yaml's ui-conversation: namespace (the host
+#    schema ignores unknown keys; KEEP them to restore your bubble customization after a reinstall)
 ```
 
-Once the bundle layer is gone, the host `ui-conversation` row restores automatically (patch-layer semantics: a layer that is not applied leaves the host row). Harmless leftovers: `focus*` fields under the `ui-conversation` namespace in the settings file (the host schema ignores unknown keys; `--clean-settings` removes them) and `dsh.chat-focus.fold.*` localStorage keys (browser-side). Session records are untouched — the plugin only renders UI.
+Browser-side localStorage `dsh.chat-focus.fold.*` keys (unreachable by any server-side tool): in the dsh tab's console run
+`Object.keys(localStorage).filter(k=>k.startsWith('dsh.chat-focus.')).forEach(k=>localStorage.removeItem(k))`, or clear site data for the dsh origin. Session records are untouched — the plugin only renders UI.
 
 ## Coexistence with dsh-web-ui-all (skins)
 
@@ -156,7 +153,8 @@ pnpm run test:engine # grouping engine behavior checks (tsx)
 
 | Host version | Fork version | Notes |
 |--------------|--------------|-------|
-| rc.5 (2026-08-16 baseline) | 0.2.0 | current baseline (v0.2: full fold strategies, bg upload/crop/fit, fold-box virtualization) |
+| rc.5 (2026-08-16 baseline) | 0.2.0 | v0.2 baseline (full fold strategies, bg upload/crop/fit, fold-box virtualization) |
+| 0.1.1-rc.2 | 0.2.5 | Adapt to the attachment plugin split (`ImageGallery` etc. no longer exported from the platform module table): user bubbles moved onto the SAME `ChatBubble` pipeline as assistant replies; message images / composer attachments now flow through the `conversation.message.images` / `conversation.input.attachments` slots; ported the `referenceLabels` projection and the new reference-chip styling |
 
 When the host upgrades:
 1. Walk `docs/design/ui-design-20260816-dsh-chat-focus-模块1-基底复制域.md` §2.3 slot-contract table (21 slots + `conversation` service + node data model);

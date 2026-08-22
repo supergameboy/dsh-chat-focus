@@ -343,6 +343,9 @@ export function apply(ctx: Context): void {
     children: {
       'conversation.input.plan': { kind: 'single', scope: 'session' },
       'conversation.input.model': { kind: 'single', scope: 'session' },
+      // Draft-image rail / drop overlay / lightbox: filled by the attachment
+      // presentation plugin when composed; empty renders nothing at all.
+      'conversation.input.attachments': { kind: 'single', scope: 'session-maybe' },
     },
     inject: (sessionId: SessionId | undefined): ComposerBarInjected => {
       if (sessionId === undefined) {
@@ -397,6 +400,7 @@ export function apply(ctx: Context): void {
               query: '',
               position: snapshot.draft.slice(0, selection.start).trim() === '' ? 'leading' : 'inline',
               span: { ...selection, draftRev: snapshot.draftRev },
+              quoted: false,
             })
           },
         stop: () => {
@@ -440,6 +444,9 @@ export function apply(ctx: Context): void {
     locale: NS,
     children: {
       'conversation.chat.node': { kind: 'keyed', scope: 'session', inject: CHAT_NODE_INJECT },
+      // Historical message-image galleries: filled by the attachment
+      // presentation plugin when composed; empty renders nothing at all.
+      'conversation.message.images': { kind: 'single', scope: 'session' },
     },
     store: chatStore,
     inject: (sessionId: SessionId, actions: BoundActions<typeof chatStore>): ChatViewInjected => {

@@ -13,6 +13,7 @@ import type {
 import type { MarkdownFileMentions } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { MessageId } from '@deepseek-ai/dsh-client-connection/client'
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
+import type { ChatBubbleCustomStyle } from '../chat/bubbles/ChatBubble.tsx'
 import type { ComposerBlock } from '../input/blocks.ts'
 import type {
   ComposerKeyboard, DraftAttachmentId, EditSelection, InputActions, InputNotice, InputState,
@@ -30,6 +31,33 @@ export interface ComposerAttachment {
   file: File
   previewUrl: string
 }
+
+/** Input state handed to the optional attachment presentation plugin. */
+export interface ComposerAttachmentsOwnerProps {
+  /** Browser-owned draft images in input order. */
+  attachments: readonly ComposerAttachment[]
+  /** Whether a document-level file drop may add images now. */
+  canAcceptDrop: boolean
+  /** Add one dropped batch through the composer's validation path. */
+  onAddImages: (files: readonly File[]) => void
+  /** Remove one draft image through the conversation service. */
+  onRemoveImage: (id: DraftAttachmentId) => void
+  /** Display-ready limits for the drop invitation. */
+  dropLimits?: { readonly count: number; readonly size: string } | undefined
+}
+
+/** Historical image group handed to the optional attachment presentation plugin. */
+export interface MessageImagesOwnerProps {
+  /** Consecutive image blocks rendered as one gallery. */
+  images: readonly { readonly attachment: ImageAttachmentRef }[]
+  /** Session-authorized durable image loader. */
+  loadImage: (attachment: ImageAttachmentRef) => Promise<string>
+  /** Message-side alignment. */
+  align: 'start' | 'end'
+}
+
+/** Slot-backed renderer used by chat nodes without importing an attachment implementation. */
+export type RenderMessageImages = (owner: Omit<MessageImagesOwnerProps, 'loadImage'>) => ReactNode
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface SlotMap {
@@ -84,6 +112,8 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
       hookContext: string
       inject: ChatNodeTurnDataInjected
     }
+    /** Optional renderer for one consecutive group of durable message images. */
+    'conversation.message.images': { kind: 'single'; scope: 'session'; owner: MessageImagesOwnerProps }
     /**
      * The chat view's per-command row hole: keyed dispatch on the command
      * name (`command/run.name`; a run-less cross-window node has none and
@@ -200,6 +230,12 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
      * command face through its own inject.
      */
     'conversation.composer.bar': { kind: 'single'; scope: 'session-maybe'; owner: ComposerBarOwnerProps }
+    /** Optional draft-image rail, drop target, and preview surface inside the composer. */
+    'conversation.input.attachments': {
+      kind: 'single'
+      scope: 'session-maybe'
+      owner: ComposerAttachmentsOwnerProps
+    }
     /**
      * The named plan-status seat in the composer tool row, immediately right
      * of the access-mode control — one occupant, so taking it means rendering
@@ -362,9 +398,19 @@ export interface ChatNodeOwnerProps {
   openFile: (path: string) => void
   inspectCall: (callId: CallId) => void
   forkAt: (seq: number) => void
-  /** Resolve a session-authorized historical image for inline display. */
-  loadImage: (attachment: ImageAttachmentRef) => Promise<string>
+  /** Render a historical image group through the attachment slot. */
+  renderMessageImages: RenderMessageImages
   fileMentions: (owner: TurnTailOwnerProps) => MarkdownFileMentions | undefined
+  /** Unified user-side bubble chrome from the focus settings (undefined = chrome off). */
+  userBubble?: UserBubbleChrome | undefined
+}
+
+/** Per-role bubble chrome handed to the unified bubble component. */
+export interface UserBubbleChrome {
+  /** Compact density preset (shared with the assistant side). */
+  readonly compact: boolean
+  /** User-side custom style overrides ('' = theme default). */
+  readonly custom: ChatBubbleCustomStyle
 }
 
 /** Full props of one registered keyed Chat business renderer. */
@@ -545,7 +591,7 @@ export interface InputControlOwnerProps {
 /** Full composer-bar props: standard kit & owner share & control-seat render share & injected share (hooks bound) & locale seat. */
 export type ComposerBarProps =
   PropsRuntime<'conversation.composer.bar'>
-  & PropsRenderSlots<'conversation.input.plan' | 'conversation.input.model'>
+  & PropsRenderSlots<'conversation.input.attachments' | 'conversation.input.plan' | 'conversation.input.model'>
   & InjectFace<ComposerBarInjected>
   & PropsLocale<'conversation'>
 
@@ -715,7 +761,8 @@ export interface ChatViewInjected {
 
 /** Full chat-view component props: runtime & its Tool/command/tail render shares & store & injected & locale seat. */
 export type ChatViewSlotProps =
-  PropsRuntime<'conversation.view'> & PropsRenderSlots<'conversation.chat.node'>
+  PropsRuntime<'conversation.view'>
+  & PropsRenderSlots<'conversation.chat.node' | 'conversation.message.images'>
   & PropsStore<ChatStore> & InjectFace<ChatViewInjected> & PropsLocale<'conversation'>
 
 /**

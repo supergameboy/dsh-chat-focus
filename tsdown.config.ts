@@ -24,16 +24,16 @@ const VENDORED_LIBRARY = /^@deepseek-ai\/(cosmokit|schemastery)(\/|$)/
 const GENERATED_REMOTE = /^@deepseek-ai\/dsh-[a-z0-9]+(?:-[a-z0-9]+)*\/remote$/
 
 /**
- * Host platform modules (static copy of packages/client/web/src/platform.ts):
- * the frozen module table entries resolved as externals at runtime.
+ * Host platform modules (static copy of packages/client/web/src/platform.ts,
+ * dsh 0.1.1-rc.2): the frozen module table entries resolved as externals at
+ * runtime. The attachment presentation moved OUT of the table into its own
+ * slot-based plugin — collaboration now goes through the
+ * `conversation.message.images` / `conversation.input.attachments` slots.
  */
 export const PLATFORM_MODULES = [
   'react', 'react/jsx-runtime', 'react-dom', 'react-dom/client', '@deepseek-ai/cordis',
   '@deepseek-ai/dsh-client-ui-slots',
-  '@deepseek-ai/dsh-client-web-react',
   '@deepseek-ai/dsh-client-ui-primitives',
-  '@deepseek-ai/dsh-client-ui-attachment',
-  '@deepseek-ai/dsh-client-schema-form',
 ] as const
 
 /** Documented temporary exemption: the snapshot-store engine rides the runtime module. */

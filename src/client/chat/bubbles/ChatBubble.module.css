@@ -1,8 +1,9 @@
-/* ChatBubble: assistant reply bubble chrome. The default mirrors the host
-   user bubble — deepseek theme blue background (--dsw-specific-bubble),
-   22px radius, no border — so both sides stay consistent. User-defined
-   overrides arrive as CSS variables (--cf-bubble-*) set inline by the
-   component. The compact variant lowers density. */
+/* ChatBubble: the ONE bubble chrome shared by both roles. The default
+   mirrors the deepseek theme blue (--dsw-specific-bubble), 22px radius,
+   no border — both sides stay consistent. User-defined overrides arrive
+   as CSS variables (--cf-bubble-*) set inline by the component. The
+   compact variant lowers density. The user variant right-aligns and
+   drops the logo (clock-only header). */
 
 .bubble {
   display: flex;

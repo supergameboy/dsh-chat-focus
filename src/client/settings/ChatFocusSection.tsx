@@ -4,7 +4,6 @@
 // root-scoped, so real session data needs a v0.2 inject channel).
 
 import { memo, useLayoutEffect, useRef, useState } from 'react'
-import type { CSSProperties } from 'react'
 import type { ObservableSnapshot } from '@deepseek-ai/dsh-client-runtime/client'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import { Modal } from '@deepseek-ai/dsh-client-ui-primitives'
@@ -16,7 +15,7 @@ import {
 } from '../../submission-settings.ts'
 import type { ChatBubbleCustomStyle } from '../chat/bubbles/ChatBubble.tsx'
 import { RuntimeFoldBox, type RuntimeFoldBoxProps } from '../chat/bubbles/RuntimeFoldBox.tsx'
-import { ChatBubble, bgImageCssValue, bgPositionCss, overlayCss } from '../chat/bubbles/ChatBubble.tsx'
+import { ChatBubble } from '../chat/bubbles/ChatBubble.tsx'
 import { ImageCropper, compressImageDataUrl } from './ImageCropper.tsx'
 import type { ConversationKey } from '../locales.ts'
 import css from './ChatFocusSection.module.css'
@@ -82,32 +81,6 @@ function previewCustom(
     fontSize: f('FontSize'),
     padding: f('Padding'),
   }
-}
-
-/** Preview style for the simulated user bubble (mirrors the host chrome). */
-function previewUserStyle(focus: ConversationSettings, overlayDraft: number | null): CSSProperties {
-  const custom = previewCustom(focus, 'user', overlayDraft)
-  const style: Record<string, string> = {}
-  const set = (name: string, value: string | undefined): void => {
-    if (value !== undefined && value !== '') style[name] = value
-  }
-  set('background', custom.bg)
-  set('border', custom.border !== '' ? `1px solid ${custom.border}` : '')
-  set('borderRadius', custom.radius)
-  set('maxWidth', custom.maxWidth)
-  set('backgroundImage', custom.bgImage === undefined ? undefined : bgImageCssValue(custom.bgImage))
-  set('backgroundSize', custom.bgSize === 'stretch' ? '100% 100%' : custom.bgSize)
-  set('backgroundPosition', bgPositionCss(custom.bgPosition) ?? '50% 50%')
-  set('boxShadow', custom.overlay === undefined ? undefined
-    : (() => {
-      const css = overlayCss(custom.overlay)
-      return css === undefined ? undefined : `inset 0 0 0 9999px ${css}`
-    })())
-  set('color', custom.textColor)
-  set('fontFamily', custom.font)
-  set('fontSize', custom.fontSize)
-  set('padding', custom.padding)
-  return style as CSSProperties
 }
 
 /** Hex color input plus free-form text input for one color field. */
@@ -858,9 +831,13 @@ export const ChatFocusSection = memo(function ChatFocusSection({
         </ChatBubble>
         <div className={css.previewUserWrap}>
           <span className={css.previewLabel}>{t('focus.previewUser')}</span>
-          <div className={css.previewUserBubble} style={previewUserStyle(focus, overlayDrafts.user)}>
+          <ChatBubble
+            role="user"
+            compact={focus.focusBubbleStyle === 'compact'}
+            custom={previewCustom(focus, 'user', overlayDrafts.user)}
+          >
             这是用户消息示例。
-          </div>
+          </ChatBubble>
         </div>
       </div>
     </div>

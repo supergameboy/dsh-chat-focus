@@ -1,7 +1,8 @@
 // MessageItem: simple chat nodes — user and consumed-steering bubbles
-// (right-aligned, with clock + copy IconActions; branch lives only under
-// assistant answers), pending steering (copy only), context injection,
-// compaction marker, retry disclosure, and unknown-surface JSON rows.
+// (right-aligned, unified ChatBubble chrome, clock + copy IconActions;
+// branch lives only under assistant answers), pending steering (copy only),
+// context injection, compaction marker, retry disclosure, and unknown-
+// surface JSON rows.
 
 import { memo, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
@@ -9,12 +10,14 @@ import type {
   ModelRetryNode, TurnErrorNode, UserMessageNode,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import { JsonBlock, MessageText, StateDot } from '@deepseek-ai/dsh-client-ui-primitives'
-import type { ChatNodeViewProps, ChatViewSlotProps } from '../contract/slots.ts'
-import { ImageGallery, type ImageLoader } from '@deepseek-ai/dsh-client-ui-attachment'
-import { messageImageLabels } from '../image-labels.ts'
+import type {
+  ChatNodeViewProps, ChatViewSlotProps, RenderMessageImages, UserBubbleChrome,
+} from '../contract/slots.ts'
 import { CompactionItem } from './CompactionItem.tsx'
 import { ContextInjectionRow } from './ContextInjectionRow.tsx'
 import { MessageIconActions } from './MessageIconActions.tsx'
+import { ReferenceIcon } from './reference/ReferenceIcon.tsx'
+import { ChatBubble } from './bubbles/ChatBubble.tsx'
 import css from './MessageItem.module.css'
 
 type UserImage = Extract<UserMessageNode['content'][number], { type: 'image' }>
@@ -149,55 +152,112 @@ function TurnMaxTokensItem({ t }: {
  * Display projection of reference forms in a user bubble (free geometry — no
  * textarea alignment constraint here); everything else stays plain text. The
  * logged model text remains the single truth; this is presentation only.
- * Plain-text `/name` / `@name` word-boundary tokens decorate (the sent text
- * IS the reference — the bubble uses the same plainest token
- * scan as the composer, minus the lexicon: sent tokens were validated at
+ * Session mentions associate by the adjacent recall node's exact labels;
+ * plain-text `/name` / `@name` / `@"quoted path"` word-boundary tokens
+ * decorate (the sent text IS the reference — the bubble uses the same plainest
+ * token scan as the composer, minus the lexicon: sent tokens were validated at
  * compose time, so shape alone decorates).
  */
-function projectUserText(text: string): ReactNode {
-  const re = /(^|\s)([/@][\w-]+)(?=\s|$)/g
-  const parts: ReactNode[] = []
-  let cursor = 0
+function projectUserText(text: string, sessionLabels: readonly string[]): ReactNode {
+  const ranges: { start: number; end: number; label: string; kind: 'session' | 'plain' }[] = []
+  for (const rawLabel of [...new Set(sessionLabels)].sort((a, b) => b.length - a.length)) {
+    const label = `@${rawLabel}`
+    let start = text.indexOf(label)
+    while (start >= 0) {
+      ranges.push({ start, end: start + label.length, label, kind: 'session' })
+      start = text.indexOf(label, start + label.length)
+    }
+  }
+  const re = /(^|\s)(\/[\w-]+|@"[^"\n]+"|@[^\s]+)/gu
   let m: RegExpExecArray | null
   while ((m = re.exec(text)) !== null) {
     const tokenStart = m.index + (m[1]?.length ?? 0)
-    const label = m[2] ?? ''
+    const rawLabel = m[2] ?? ''
+    const label = rawLabel.startsWith('@"')
+      ? rawLabel
+      : rawLabel.replace(/[.,;:!?，。；：！？]+$/gu, '')
+    if (label.length <= 1) continue
+    ranges.push({ start: tokenStart, end: tokenStart + label.length, label, kind: 'plain' })
+  }
+  ranges.sort((a, b) => a.start - b.start
+    || (a.kind === b.kind ? b.end - a.end : a.kind === 'session' ? -1 : 1))
+  const parts: ReactNode[] = []
+  let cursor = 0
+  for (const range of ranges) {
+    if (range.start < cursor) continue
+    const { start: tokenStart, end, label, kind } = range
     if (tokenStart > cursor) parts.push(<MessageText key={cursor} text={text.slice(cursor, tokenStart)} />)
+    const referenceKind = kind === 'session'
+      ? 'session'
+      : label.startsWith('@')
+        ? label.endsWith('/') ? 'folder' : 'file'
+        : undefined
+    const displayLabel = referenceKind === undefined
+      ? label
+      : referenceKind === 'session'
+        ? label.slice(1)
+        : label.slice(1).replace(/^"|"$/gu, '').split(/[\\/]/u).filter(Boolean).at(-1) ?? label.slice(1)
     parts.push(
-      <span key={tokenStart} className={css.refChip} data-ref-chip={label.startsWith('@') ? 'subagent' : 'skill'}>
-        {label}
+      <span
+        key={tokenStart}
+        className={css.refChip}
+        data-ref-chip={referenceKind ?? 'skill'}
+        title={label}
+      >
+        {referenceKind !== undefined && (
+          <ReferenceIcon kind={referenceKind} size={16} className={css.refIcon} />
+        )}
+        {displayLabel}
       </span>,
     )
-    cursor = tokenStart + label.length
+    cursor = end
   }
   if (parts.length === 0) return <MessageText text={text} />
   if (cursor < text.length) parts.push(<MessageText key={cursor} text={text.slice(cursor)} />)
   return <>{parts}</>
 }
 
-/** Right-aligned bubble shared by user and steering rows. */
+/** Right-aligned user-side row shared by durable and pending steering messages.
+ *  Content renders through the SAME ChatBubble chrome as assistant replies
+ *  (role="user": clock-only header, right-aligned), so both sides share one
+ *  component, one CSS module, and one custom-style pipeline. */
 function UserStyleBubble({
-  content, imageLoader, actions, pending = false, t,
+  content, renderMessageImages, chrome, actions, pending = false, referenceLabels = [], t,
 }: {
   content: readonly unknown[]
-  imageLoader: ImageLoader
+  /** Historical image groups render through the attachment slot. */
+  renderMessageImages: RenderMessageImages
+  /** Unified bubble chrome from the focus settings. */
+  chrome?: UserBubbleChrome | undefined
   /** Optional IconActions (or similar) below the bubble; receives the joined text. */
   actions?: (text: string) => ReactNode
   /** Whether this is the Host-authoritative pre-admission steering projection. */
   pending?: boolean
+  /** Exact session mention labels associated by the adjacent recall node. */
+  referenceLabels?: readonly string[]
   t: ChatViewSlotProps['t']
 }): ReactNode {
   const { text, images, rest } = contentParts(content)
   const truncated = (total: number): string => t('json.truncated', { total })
-  const showBubble = text !== '' || rest.length > 0
+  const showBody = text !== '' || rest.length > 0
+  const body = showBody && chrome !== undefined
+    ? (
+      <ChatBubble role="user" compact={chrome.compact} custom={chrome.custom}>
+        {projectUserText(text, referenceLabels)}
+        {rest.map((block, i) => <JsonBlock key={i} label={t('message.extraBlock')} payload={block} truncatedLabel={truncated} />)}
+      </ChatBubble>
+    )
+    : null
   return (
     <div className={css.userRow} data-pending-steering={pending || undefined} data-time-hover-root>
       <div className={css.userStack}>
-        <ImageGallery images={images} load={imageLoader} align="end" labels={messageImageLabels(t)} />
-        {showBubble && <div className={css.bubble}>
-          {projectUserText(text)}
-          {rest.map((block, i) => <JsonBlock key={i} label={t('message.extraBlock')} payload={block} truncatedLabel={truncated} />)}
-        </div>}
+        {renderMessageImages({ images, align: 'end' })}
+        {body}
+        {referenceLabels.length > 0 && (
+          <div className={css.referenceSummary}>
+            {t('message.referenceSummary', { labels: referenceLabels.join(t('message.referenceSeparator')) })}
+          </div>
+        )}
       </div>
       {actions?.(text)}
     </div>
@@ -210,16 +270,18 @@ function UserStyleBubble({
  * @param props - Pending message content and conversation translator.
  * @returns the pending steering bubble.
  */
-export function PendingSteeringBubble({ content, loadImage, t }: {
+export function PendingSteeringBubble({ content, renderMessageImages, chrome, t }: {
   content: readonly unknown[]
-  loadImage?: ImageLoader
+  renderMessageImages: RenderMessageImages
+  /** Unified bubble chrome from the focus settings. */
+  chrome?: UserBubbleChrome | undefined
   t: ChatViewSlotProps['t']
 }): ReactNode {
-  const imageLoader = loadImage ?? (() => Promise.reject(new Error(t('image.serviceUnavailable'))))
   return (
     <UserStyleBubble
       content={content}
-      imageLoader={imageLoader}
+      renderMessageImages={renderMessageImages}
+      chrome={chrome}
       pending
       t={t}
       actions={text => (
@@ -236,13 +298,15 @@ export function PendingSteeringBubble({ content, loadImage, t }: {
 
 /** User and admitted-steering keyed Chat renderer. */
 export const UserMessageNodeView = memo(function UserMessageNodeView({
-  node, loadImage, t,
+  node, renderMessageImages, userBubble: chrome, t,
 }: ChatNodeViewProps<'user' | 'steering'>) {
   const data = node.data
   return (
     <UserStyleBubble
       content={data.content}
-      imageLoader={loadImage}
+      renderMessageImages={renderMessageImages}
+      chrome={chrome}
+      {...data.referenceLabels === undefined ? {} : { referenceLabels: data.referenceLabels }}
       t={t}
       actions={text => (
         <MessageIconActions

@@ -1,5 +1,5 @@
-/* User bubble: right-aligned column (bubble + IconActions). Figma
-   User_Bubble/message_container 659:38813 — r22 fill, actions gap 6 below. */
+/* User message row: right-aligned column (unified ChatBubble + IconActions).
+   Figma User_Bubble/message_container 659:38813 — r22 fill, actions gap 6 below. */
 
 .userRow {
   display: flex;
@@ -14,29 +14,13 @@
   align-items: flex-end;
   gap: 8px;
   min-width: 0;
-  max-width: min(525px, 82%);
+  max-width: 100%;
 }
-.bubble {
-  /* 525px cap inside the 736 column; percentage keeps narrow windows sane.
-     All chrome reads --cf-user-* variables (set by the focus view on the
-     row container) so user bubbles share the full customization surface
-     with assistant bubbles. */
-  max-width: var(--cf-user-bubble-max-width, 100%);
-  background-color: var(--cf-user-bubble-bg, var(--dsw-specific-bubble));
-  border: 1px solid var(--cf-user-bubble-border, transparent);
-  border-radius: var(--cf-user-bubble-radius, 22px);
-  /* 44px single-line bubble: 24 line + 10 vertical padding each side. */
-  padding: var(--cf-user-bubble-padding, 10px 16px);
-  font-size: var(--cf-user-bubble-font-size, 16px);
-  line-height: 24px;
-  color: var(--cf-user-bubble-text-color, var(--dsw-alias-label-primary));
-  font-family: var(--cf-user-bubble-font, inherit);
-  background-image: var(--cf-user-bubble-bg-image, none);
-  background-size: var(--cf-user-bubble-bg-size, cover);
-  background-position: var(--cf-user-bubble-bg-position, 50% 50%);
-  /* Text-readability overlay: an inset shadow draws above the background and
-     below the content, darkening/lightening the image behind the text. */
-  box-shadow: inset 0 0 0 9999px var(--cf-user-bubble-overlay, transparent);
+
+.referenceSummary {
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 12px;
+  line-height: 18px;
 }
 
 .contextRow {
@@ -279,17 +263,19 @@
   }
 }
 
-/* Reference chip projection inside a user bubble (`<skill>name</skill>` model
-   spans render as chips; free geometry — no textarea pairing here). */
+/* Inline references use domain glyphs and business-color text without another
+   container inside the user bubble. */
 .refChip {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   margin: 0 2px;
-  padding: 0 8px;
-  border-radius: 6px;
-  background: rgba(97, 135, 216, 0.22);
-  color: var(--dsw-alias-label-primary);
-  font-size: 0.85em;
-  line-height: 1.6;
+  color: var(--dsw-alias-state-business-primary);
+  font-weight: 500;
   white-space: nowrap;
   vertical-align: baseline;
+}
+
+.refIcon {
+  flex: none;
 }

@@ -456,7 +456,7 @@ export class SessionInputShell implements SessionInput {
       this.run(this.core.dispatch({ type: 'adjudicated', attempt, outcome: undefined }))
       return
     }
-    inputTriggers.adjudicate(draft.trim(), attempt.signal).then(
+    inputTriggers.adjudicate(draft.trim(), attempt.signal, { images: this.imageIds.length }).then(
       (outcome: PickOutcome) => {
         if (this.dead(attempt)) return
         this.run(this.core.dispatch({ type: 'adjudicated', attempt, outcome }))
@@ -469,10 +469,11 @@ export class SessionInputShell implements SessionInput {
     )
   }
 
-  /** The submit transaction: claim.submit against the session scope; ok maps from the outcome kind. */
+  /** The submit transaction: claim.submit against the session scope; ok maps from the outcome kind.
+   *  (Command-plane image payloads stay a host-side feature; the fork submits none.) */
   private beginSubmit(attempt: SubmitAttempt, claim: CommandClaim, args: string): void {
     Promise.resolve()
-      .then(() => claim.submit(args, this.deps.actx))
+      .then(() => claim.submit(args, this.deps.actx, []))
       .then(
         (outcome) => {
           if (this.dead(attempt)) return

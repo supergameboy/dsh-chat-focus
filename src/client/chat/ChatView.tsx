@@ -17,12 +17,14 @@
 // ChatNodeSeat subscribes to one Node key, so Assistant deltas and Tool
 // lifecycle updates replace only their own row without remounting it.
 
-import { Component, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import type { CSSProperties, ReactNode } from 'react'
+import { Component, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import type { ReactNode } from 'react'
 import type { ConversationTimelineSnapshot } from '@deepseek-ai/dsh-client-runtime/client'
 import type { ChatConversationViewNode } from '@deepseek-ai/dsh-client-runtime/client'
 import { IconChevronDownOutline14 } from '@deepseek-ai/dsh-client-ui-primitives'
-import type { ChatViewSlotProps } from '../contract/slots.ts'
+import type {
+  ChatViewSlotProps, RenderMessageImages, UserBubbleChrome,
+} from '../contract/slots.ts'
 import type { ConversationSettings } from '../../submission-settings.ts'
 import type { FocusBubbleBgSize } from '../../submission-settings.ts'
 import type { AssistantChatData } from '../contract/chat-nodes.ts'
@@ -33,7 +35,7 @@ import { AssistantMarkdown } from './AssistantMarkdown.tsx'
 import { ReasoningRow } from './ReasoningRow.tsx'
 import { buildGroups, type GroupRow } from './grouping/engine.ts'
 import { RuntimeFoldBox } from './bubbles/RuntimeFoldBox.tsx'
-import { ChatBubble, bgImageCssValue, bgPositionCss, overlayCss } from './bubbles/ChatBubble.tsx'
+import { ChatBubble } from './bubbles/ChatBubble.tsx'
 import { formatRunDuration } from './message-chrome.ts'
 import css from './ChatView.module.css'
 
@@ -68,7 +70,8 @@ interface BubbleSideFields {
 }
 
 /** Build the custom-style object for one bubble side; a gradient overrides the
- *  background image (GUI-edited fields, no hand-written CSS needed). */
+ *  background image (GUI-edited fields, no hand-written CSS needed). Both
+ *  roles share this builder — the unified ChatBubble chrome consumes it. */
 function bubbleCustom(side: BubbleSideFields): ChatBubbleCustomStyle {
   const gradient = side.gradientFrom !== ''
   return {
@@ -89,26 +92,28 @@ function bubbleCustom(side: BubbleSideFields): ChatBubbleCustomStyle {
   }
 }
 
-/** All --cf-user-* CSS variables for the host user bubble, from one side's fields. */
-function userBubbleVars(side: BubbleSideFields): Record<string, string> {
-  const custom = bubbleCustom(side)
-  const vars: Record<string, string> = {}
-  const set = (name: string, value: string | undefined): void => {
-    if (value !== undefined && value !== '') vars[name] = value
+/** The user-side chrome for the unified bubble, from one focus snapshot. */
+function userBubbleChrome(focus: ConversationSettings): UserBubbleChrome {
+  return {
+    compact: focus.focusBubbleStyle === 'compact',
+    custom: bubbleCustom({
+      bg: focus.focusUserBubbleBg,
+      border: focus.focusUserBubbleBorder,
+      radius: focus.focusUserBubbleRadius,
+      maxWidth: focus.focusUserBubbleMaxWidth,
+      bgImage: focus.focusUserBubbleBgImage,
+      bgSize: focus.focusUserBubbleBgSize,
+      bgPosition: focus.focusUserBubbleBgPosition,
+      overlay: focus.focusUserBubbleOverlay,
+      gradientFrom: focus.focusUserBubbleGradientFrom,
+      gradientTo: focus.focusUserBubbleGradientTo,
+      gradientAngle: focus.focusUserBubbleGradientAngle,
+      textColor: focus.focusUserBubbleTextColor,
+      font: focus.focusUserBubbleFont,
+      fontSize: focus.focusUserBubbleFontSize,
+      padding: focus.focusUserBubblePadding,
+    }),
   }
-  set('--cf-user-bubble-bg', custom.bg)
-  set('--cf-user-bubble-border', custom.border)
-  set('--cf-user-bubble-radius', custom.radius)
-  set('--cf-user-bubble-max-width', custom.maxWidth)
-  set('--cf-user-bubble-bg-image', custom.bgImage === undefined ? undefined : bgImageCssValue(custom.bgImage))
-  set('--cf-user-bubble-bg-size', custom.bgSize === 'stretch' ? '100% 100%' : custom.bgSize)
-  set('--cf-user-bubble-bg-position', bgPositionCss(custom.bgPosition))
-  set('--cf-user-bubble-overlay', custom.overlay === undefined ? undefined : overlayCss(custom.overlay))
-  set('--cf-user-bubble-text-color', custom.textColor)
-  set('--cf-user-bubble-font', custom.font)
-  set('--cf-user-bubble-font-size', custom.fontSize)
-  set('--cf-user-bubble-padding', custom.padding)
-  return vars
 }
 
 /** Active column host when present; otherwise the view-local scroller. */
@@ -258,13 +263,13 @@ class ChatViewErrorBoundary extends Component<{
 /** One rendered group row: reply rows split thinking outside the bubble,
  *  runtime fold box, or plain rows (the host user row renders its own
  *  bubble chrome). */
-function FocusGroupRow({ group, focus, nodeStore, renderSeat, useSession, loadImage, openFile, fileMentions, t }: {
+function FocusGroupRow({ group, focus, nodeStore, renderSeat, useSession, renderMessageImages, openFile, fileMentions, t }: {
   group: GroupRow
   focus: ConversationSettings
   nodeStore: { get(key: string): ChatConversationViewNode | undefined }
   renderSeat: (nodeKey: string) => ReactNode
   useSession: ChatViewSlotProps['useSession']
-  loadImage: ChatViewSlotProps['loadImage']
+  renderMessageImages: RenderMessageImages
   openFile: ChatViewSlotProps['openFile']
   fileMentions: ChatViewSlotProps['fileMentions']
   t: ChatViewSlotProps['t']
@@ -315,33 +320,10 @@ function FocusGroupRow({ group, focus, nodeStore, renderSeat, useSession, loadIm
     )
   }
   if (group.kind === 'user') {
-    // The host user row reads --cf-user-* variables for its bubble chrome;
-    // set them on this container so user bubbles share the full
-    // customization surface with assistant bubbles.
-    const userStyle = userBubbleVars({
-      bg: focus.focusUserBubbleBg,
-      border: focus.focusUserBubbleBorder,
-      radius: focus.focusUserBubbleRadius,
-      maxWidth: focus.focusUserBubbleMaxWidth,
-      bgImage: focus.focusUserBubbleBgImage,
-      bgSize: focus.focusUserBubbleBgSize,
-      bgPosition: focus.focusUserBubbleBgPosition,
-      overlay: focus.focusUserBubbleOverlay,
-      gradientFrom: focus.focusUserBubbleGradientFrom,
-      gradientTo: focus.focusUserBubbleGradientTo,
-      gradientAngle: focus.focusUserBubbleGradientAngle,
-      textColor: focus.focusUserBubbleTextColor,
-      font: focus.focusUserBubbleFont,
-      fontSize: focus.focusUserBubbleFontSize,
-      padding: focus.focusUserBubblePadding,
-    })
+    // The user row renders through the same unified ChatBubble chrome as
+    // assistant replies; the chrome rides the seat's owner currency.
     return (
-      <div
-        className={css.flowItem}
-        data-chat-flow-key={group.nodeKey}
-        data-chat-flow-kind={group.kind}
-        style={Object.keys(userStyle).length > 0 ? userStyle as CSSProperties : undefined}
-      >
+      <div className={css.flowItem} data-chat-flow-key={group.nodeKey} data-chat-flow-kind={group.kind}>
         {renderSeat(group.nodeKey)}
       </div>
     )
@@ -369,7 +351,7 @@ function FocusGroupRow({ group, focus, nodeStore, renderSeat, useSession, loadIm
       blocks={bubbleBlocks}
       streaming={streaming}
       interrupted={interrupted}
-      loadImage={loadImage}
+      renderMessageImages={renderMessageImages}
       mentions={mentions}
       t={t}
     />
@@ -434,6 +416,13 @@ export function ChatView({
     () => inbox.filter(item => item.placement === 'steering'),
     [inbox],
   )
+  // Historical image groups render through the attachment presentation
+  // plugin's slot entry (the loader stays session-scoped on this view).
+  const renderMessageImages = useCallback<RenderMessageImages>(
+    owner => renderSlot('conversation.message.images', { ...owner, loadImage }),
+    [loadImage, renderSlot],
+  )
+  const userChrome = useMemo(() => userBubbleChrome(focus), [focus])
   const runningTurnStart = useMemo(() => runningTurnStartTime(timeline), [timeline])
   const groups = useMemo(
     () => buildGroups(order, nodeStore, focus),
@@ -648,7 +637,8 @@ export function ChatView({
       openFile={openFile}
       inspectCall={inspectCall}
       forkAt={forkAt}
-      loadImage={loadImage}
+      renderMessageImages={renderMessageImages}
+      userBubble={userChrome}
       fileMentions={fileMentions}
       renderSlot={renderSlot}
       t={t}
@@ -681,7 +671,7 @@ export function ChatView({
                 nodeStore={nodeStore}
                 renderSeat={renderSeat}
                 useSession={useSession}
-                loadImage={loadImage}
+                renderMessageImages={renderMessageImages}
                 openFile={openFile}
                 fileMentions={fileMentions}
                 t={t}
@@ -694,7 +684,13 @@ export function ChatView({
                 wait, tool execution, streaming) so it never flickers per step. */}
             {running && <TurnStatus startTime={runningTurnStart} t={t} />}
             {pendingSteering.map(item => (
-              <PendingSteeringBubble key={item.id} content={item.content} loadImage={loadImage} t={t} />
+              <PendingSteeringBubble
+                key={item.id}
+                content={item.content}
+                renderMessageImages={renderMessageImages}
+                chrome={userChrome}
+                t={t}
+              />
             ))}
           </div>
           {!atBottom && (

@@ -32,7 +32,7 @@ dsh web 对话界面插件：将文本回复之前的**连续运行时信息**�
 
 ## 安装
 
-宿主提供官方插件管理命令 `dsh plugin --profile <name> <pnpm args...>`（pnpm 转发 + 自动把声明 `dsh.bundle` 的依赖加入 `dsh.profile.bundles` 层列表）。
+统一使用宿主官方插件管理命令 `dsh plugin --profile <name> <pnpm args...>`（pnpm 转发 + 自动把声明 `dsh.bundle` 的依赖加入 `dsh.profile.bundles` 层列表）。本项目不提供、也不需要任何包装脚本。
 
 从 npm 安装（推荐）：
 
@@ -40,18 +40,11 @@ dsh web 对话界面插件：将文本回复之前的**连续运行时信息**�
 dsh plugin --profile web add dsh-chat-focus
 ```
 
-本地开发方式（一键脚本，含备份与校验）：
-
-```sh
-node scripts/install.mjs          # 默认 web profile
-node scripts/install.mjs --profile web --plugin-path E:\dsh-chat-focus
-```
-
-等价手动步骤（本地方式）：
+本地开发方式（官方命令直装本地目录）：
 
 ```sh
 pnpm run bundle                                                  # 先构建 lib/client.js
-dsh plugin --profile web add "link:E:\dsh-chat-focus"            # 安装并自动加入 bundle 层
+dsh plugin --profile web add "link:E:\dsh-chat-focus"            # 官方命令，自动加入 bundle 层
 # 重启 dsh web
 ```
 
@@ -59,20 +52,24 @@ bundle 的 patch 层（`cordis.patch.yml`）由 loader 自动应用：宿主 `ui
 
 ## 卸载
 
-官方命令形式（推荐）：
+只使用官方命令：
 
 ```sh
 dsh plugin --profile web remove dsh-chat-focus   # 移除依赖 + bundle 层，重启后宿主 ui-conversation 行自动恢复
 ```
 
-一键脚本（node 全平台，含备份、残留校验与可选设置清理）：
+官方命令之后的两处可选手动清理（均为惰性残留，不影响运行；是否清理自行决定）：
 
-```sh
-node scripts/uninstall.mjs                 # 内部即执行 dsh plugin --profile web remove dsh-chat-focus；保留设置字段残留（无害）
-node scripts/uninstall.mjs --clean-settings  # 同时清理 settings.yaml 的 focus* 字段
+```powershell
+# 1) 仅 link: 方式安装才会留下的 node_modules 目录链接（加载器不会读取）：
+Remove-Item C:\Users\super\.dsh\profiles\web\node_modules\dsh-chat-focus -Force -Recurse
+
+# 2) settings.yaml 中 ui-conversation: 命名空间的 focus* 自定义字段（宿主 schema 放行未知键；
+#    保留它，重装后气泡自定义原样恢复）——按需手动删除对应行
 ```
 
-移除 bundle 层后，宿主 `ui-conversation` 行自动恢复（补丁层机制：层不应用即回到宿主行）。残留（均无害）：设置文件 `ui-conversation` 命名空间中的 focus 字段（宿主 schema 放行未知键，`--clean-settings` 可清理）；localStorage `dsh.chat-focus.fold.*`（浏览器端）。会话记录零污染（插件仅 UI 渲染，不写 session log）。
+浏览器端 localStorage `dsh.chat-focus.fold.*`（服务端任何工具都触达不到）：在 dsh 页面 F12 Console 执行
+`Object.keys(localStorage).filter(k=>k.startsWith('dsh.chat-focus.')).forEach(k=>localStorage.removeItem(k))`，或直接清除 dsh 站点数据。会话记录零污染（插件仅 UI 渲染，不写 session log）。
 
 ## 与 dsh-web-ui-all（皮肤）共存
 
@@ -156,7 +153,8 @@ pnpm run test:engine # 分组引擎行为检查（tsx）
 
 | 宿主版本 | fork 版本 | 说明 |
 |---------|----------|------|
-| rc.5（2026-08-16 基线） | 0.2.0 | 当前基线（v0.2：折叠策略全模式、背景图上传/裁剪/适配、折叠框虚拟化） |
+| rc.5（2026-08-16 基线） | 0.2.0 | v0.2 基线（折叠策略全模式、背景图上传/裁剪/适配、折叠框虚拟化） |
+| 0.1.1-rc.2 | 0.2.5 | 适配 attachment 插件化（`ImageGallery` 等原子不再从平台模块表导出）：用户气泡改走与助手同构的 `ChatBubble` 统一管线；消息图片/输入区附件改经 `conversation.message.images` / `conversation.input.attachments` 槽位；移植 `referenceLabels` 引用投影与新参考 chip 样式 |
 
 宿主升级后按以下流程适配：
 1. 逐项核对 `docs/design/ui-design-20260816-dsh-chat-focus-模块1-基底复制域.md` §2.3 槽位契约保持表（21 槽位 + `conversation` 服务 + 节点数据模型）；

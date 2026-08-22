@@ -1,8 +1,8 @@
-// ChatBubble: themeable chat-bubble chrome for assistant text replies —
-// DeepSeek fish logo, HH:MM (calendar-aware) time, the compact density
-// variant, and user-defined colors/border/radius/width/background image via
-// CSS variables. The default look mirrors the host user bubble (deepseek
-// theme blue), so the two sides stay consistent out of the box.
+// ChatBubble: the ONE themeable chat-bubble chrome shared by both roles —
+// assistant replies (DeepSeek fish logo + HH:MM header) and user messages
+// (clock-only, right-aligned header). User-defined colors/border/radius/
+// width/background image arrive via CSS variables. Default look mirrors the
+// DeepSeek theme blue on both sides, so the two sides stay consistent.
 
 import { memo } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
@@ -87,7 +87,7 @@ export function overlayCss(value: string): string | undefined {
 
 /** Full props of one bubble row. */
 export interface ChatBubbleProps {
-  /** Which side the bubble belongs to. */
+  /** Which side the bubble belongs to (drives header chrome and alignment). */
   readonly role: 'user' | 'assistant'
   /** Compact density preset. */
   readonly compact: boolean
@@ -99,7 +99,8 @@ export interface ChatBubbleProps {
   readonly children: ReactNode
 }
 
-/** Bubble chrome wrapper: role icon + clock header and the themed container. */
+/** Bubble chrome wrapper: role-aware header (fish logo + clock for the
+ *  assistant, clock only for the user) and the themed container. */
 export const ChatBubble = memo(function ChatBubble({
   role, compact, time, custom, children,
 }: ChatBubbleProps) {
@@ -137,16 +138,21 @@ export const ChatBubble = memo(function ChatBubble({
   if (custom?.maxWidth !== undefined && custom.maxWidth !== '') {
     bubbleStyle['--cf-bubble-max-width'] = custom.maxWidth
   }
+  const showHeader = role === 'assistant' || time !== undefined
   return (
     <div className={clsx(css.bubble, role === 'user' ? css.user : css.assistant, compact && css.compact)} style={bubbleStyle as CSSProperties}>
-      <div className={css.header}>
-        <span className={css.roleIcon} aria-hidden>
-          <FishLogo size={14} />
-        </span>
-        {time !== undefined && (
-          <span className={css.clock}>{bubbleTimeLabel(time, Date.now())}</span>
-        )}
-      </div>
+      {showHeader && (
+        <div className={css.header}>
+          {role === 'assistant' && (
+            <span className={css.roleIcon} aria-hidden>
+              <FishLogo size={14} />
+            </span>
+          )}
+          {time !== undefined && (
+            <span className={css.clock}>{bubbleTimeLabel(time, Date.now())}</span>
+          )}
+        </div>
+      )}
       <div className={css.content} style={customVars as CSSProperties}>{children}</div>
     </div>
   )
