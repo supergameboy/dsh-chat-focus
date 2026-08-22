@@ -47,7 +47,7 @@
     "typecheck": "tsc --noEmit",
     "decl": "tsc -p tsconfig.decl.json",
     "build": "pnpm run typecheck && pnpm run decl && pnpm run bundle",
-    "prepublishOnly": "pnpm run build",
+    "prepublishOnly": "node node_modules/typescript/lib/tsc.js --noEmit && node node_modules/typescript/lib/tsc.js -p tsconfig.decl.json && node node_modules/tsdown/dist/run.mjs",
     "test:engine": "node --import tsx/esm tests/engine.check.ts",
     "setup:links": "node scripts/setup-junctions.mjs"
   },
