@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Set up build-time node_modules links against the host checkout
- * (default ../deepseek-harness, rc.5 baseline). pnpm workspace cannot install
+ * (default ../deepseek-harness, 0.1.2-alpha.5 baseline). pnpm workspace cannot install
  * across parent directories reliably, so the few packages tsdown/tsc need are
  * linked by hand. Cross-platform: directory junctions on Windows, symlinks
  * elsewhere. Never run pnpm install afterwards here — it may rewrite the host
@@ -49,6 +49,7 @@ linkDir('tsdown', join(hostRoot, 'node_modules', 'tsdown'))
 linkDir('lightningcss', join(hostRoot, 'node_modules', 'lightningcss'))
 linkDir('tsx', join(hostRoot, 'node_modules', 'tsx'))
 linkDir('@types/react', join(hostRoot, 'node_modules', '.pnpm', 'node_modules', '@types', 'react'))
+linkDir('@types/react-dom', join(hostRoot, 'node_modules', '.pnpm', '@types+react-dom@18.3.7_@types+react@18.3.31', 'node_modules', '@types', 'react-dom'))
 
 // Vendored framework libraries (inlined into the client bundle).
 linkDir('@deepseek-ai/cordis', join(hostRoot, 'vendor', 'cordis'))
@@ -57,5 +58,18 @@ linkDir('@deepseek-ai/schemastery', join(hostRoot, 'vendor', 'schemastery'))
 
 // Node-half dependency (externalized, linked for completeness).
 linkDir('@deepseek-ai/dsh-settings', join(hostRoot, 'packages', 'settings', 'settings'))
+
+// alpha.5 contract packages: engine store (module-table seed word), inline
+// wire layers (dsh-session/dsh-llm/dsh-util-*), row/type authorities, and the
+// api session/workspace controller faces. dsh-client-runtime no longer exists
+// on the host (removed in 0.1.2-alpha.5) and must not be linked.
+linkDir('@deepseek-ai/dsh-client-store', join(hostRoot, 'packages', 'client', 'store'))
+linkDir('@deepseek-ai/dsh-client-ui-conversation', join(hostRoot, 'packages', 'client', 'ui-conversation'))
+linkDir('@deepseek-ai/dsh-session', join(hostRoot, 'packages', 'core', 'session'))
+linkDir('@deepseek-ai/dsh-llm', join(hostRoot, 'packages', 'llm', 'llm'))
+linkDir('@deepseek-ai/dsh-util-workspace-path', join(hostRoot, 'packages', 'util', 'workspace-path'))
+linkDir('@deepseek-ai/dsh-util-crypto', join(hostRoot, 'packages', 'util', 'crypto'))
+linkDir('@deepseek-ai/dsh-api-session-controller', join(hostRoot, 'packages', 'api', 'session-controller'))
+linkDir('@deepseek-ai/dsh-api-workspace-controller', join(hostRoot, 'packages', 'api', 'workspace-controller'))
 
 process.stdout.write('setup complete\n')

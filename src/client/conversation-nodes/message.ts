@@ -1,12 +1,10 @@
 import type { Context } from '@deepseek-ai/cordis'
-import type {
-  ContextMessageNode, ConversationNodeDefinition, SteeringMessageNode, UserMessageNode,
-} from '@deepseek-ai/dsh-client-runtime/client'
-import {
-  contextForm, contextProvenance, isAppendSurfaceEvent, isReplacementSurfaceEvent,
-} from '@deepseek-ai/dsh-client-runtime/client'
+import type { ConversationNodeDefinition } from '@deepseek-ai/dsh-client-ui-conversation/client'
+import { isAppendSurfaceEvent, isReplacementSurfaceEvent } from '@deepseek-ai/dsh-session/surface'
+import type { ContextMessageNode, SteeringMessageNode, UserMessageNode } from '../contract/snapshot.ts'
 import type { InboxState } from './inbox.ts'
 import { chatNode } from './common.ts'
+import { contextForm, contextProvenance } from './event-projection.ts'
 
 interface ReferencedUserMessageNode extends UserMessageNode {
   /** Labels cited by the immediately following session-reference context. */
@@ -20,7 +18,7 @@ interface ReferencedSteeringMessageNode extends SteeringMessageNode {
 
 type MessageNode = ReferencedUserMessageNode | ReferencedSteeringMessageNode | ContextMessageNode
 
-declare module 'dsh-chat-focus/client' {
+declare module '../contract/chat-nodes.ts' {
   interface ChatNodeDataMap {
     /** Ordinary turn-opening user message. */
     user: ReferencedUserMessageNode
@@ -60,7 +58,8 @@ export const messageDefinition: ConversationNodeDefinition<MessageNode> = {
         form: contextForm(event.data.source),
       }
     }
-    const claimed = reader.previous<InboxState>('inbox-next-step')?.state.claimed.has(String(event.data.id)) === true
+    const claimed = reader.previous<InboxState>('inbox-next-step')
+      ?.state.currentClaimed.has(String(event.data.id)) === true
     return claimed
       ? {
         kind: 'steering',
@@ -90,5 +89,5 @@ export const messageDefinition: ConversationNodeDefinition<MessageNode> = {
  * @param ctx - owning UI Conversation context.
  */
 export function registerMessageConversationNode(ctx: Context): void {
-  ctx.conversationEvents.register(messageDefinition)
+  ctx.uiConversation.events.register(messageDefinition)
 }

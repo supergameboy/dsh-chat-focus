@@ -1,34 +1,49 @@
-/**
- * Per-session chat store shared by conversation and details registrations.
- * The plugin creates its handle at apply time so identity follows the fiber.
- */
-import { defineStore, type EngineStoreHandle } from '@deepseek-ai/dsh-client-runtime/client'
-import type { CallId, ChatStoreState, SelectionTarget } from './contract/views.ts'
+/** Per-Session Chat selection store shared by the transcript and details panel. */
+import { defineStore, type EngineStoreHandle } from '@deepseek-ai/dsh-client-store'
+import type { ChatStoreState, SelectionTarget, TurnProcessViewEntry } from './contract/store.ts'
 
-/** Declared action shape used to give the exported factory a stable return type. */
 type ChatActions = {
   select: (draft: ChatStoreState, target: SelectionTarget | null) => void
-  setDraft: (draft: ChatStoreState, text: string) => void
-  setView: (draft: ChatStoreState, view: string) => void
-  setInspect: (draft: ChatStoreState, target: { callId: CallId } | null) => void
+  setTurnProcessOpen: (
+    draft: ChatStoreState,
+    turn: number,
+    answerStep: number,
+    open: boolean,
+  ) => void
 }
 
 /**
- * Declares the per-session chat state and write surface.
- * @returns the store handle.
+ * Resolve the manually expanded answer for one Turn.
+ * @param state - Chat store snapshot.
+ * @param turn - owning Turn.
+ * @returns the Turn's stored entry, when present.
+ */
+export function storedTurnProcessEntry(
+  state: Readonly<ChatStoreState>,
+  turn: number,
+): Readonly<TurnProcessViewEntry> | undefined {
+  return state.turnProcesses.find(entry => entry.turn === turn)
+}
+
+/**
+ * Create the Chat selection store handle.
+ * @returns a handle instantiated once per rendered Session scope.
  */
 export function createChatStore(): EngineStoreHandle<ChatStoreState, ChatActions> {
   return defineStore({
-    // Anchored to the contract shape: consumers read the store through
-    // PropsStore<ChatStore>'s SnapshotSelectorHook<ChatStoreState>, so init
-    // and the contract cannot drift.
-    init: (): ChatStoreState => ({ selection: null, draft: '', view: null, inspect: null }),
-    persist: 'dsh.conversation.chat',
+    init: (): ChatStoreState => ({ selection: null, turnProcesses: [] }),
     actions: {
-      select: (d, target: SelectionTarget | null) => { d.selection = target },
-      setDraft: (d, text: string) => { d.draft = text },
-      setView: (d, view: string) => { d.view = view },
-      setInspect: (d, target: { callId: CallId } | null) => { d.inspect = target },
+      select: (draft, target: SelectionTarget | null) => { draft.selection = target },
+      setTurnProcessOpen: (draft, turn, answerStep, open) => {
+        const index = draft.turnProcesses.findIndex(entry => entry.turn === turn)
+        if (!open) {
+          if (index >= 0) draft.turnProcesses.splice(index, 1)
+          return
+        }
+        const next = { turn, answerStep } satisfies TurnProcessViewEntry
+        if (index < 0) draft.turnProcesses.push(next)
+        else draft.turnProcesses[index] = next
+      },
     },
   })
 }

@@ -1,12 +1,17 @@
 /**
  * ChatFocus grouping engine: node classification, runtime-run segmentation,
- * and summary projection. Pure functions over the conversation snapshot —
- * no IO, no DOM, no host mutation. The rendered view consumes these rows.
+ * and summary projection. Pure functions over the chat snapshot — no IO, no
+ * DOM, no host mutation. The rendered view consumes these rows.
  */
 
-import type { ChatConversationViewNode } from '@deepseek-ai/dsh-client-runtime/client'
-import type { ChatNodeKind } from '../../contract/chat-nodes.ts'
-import type { ChatFocusSettings } from '../../../submission-settings.ts'
+import type { ChatFocusSettings } from '../../../chat-settings.ts'
+
+/** Structural chat-node face the engine reads (the alpha snapshot splits kind/data from the view node). */
+export interface FocusNode {
+  readonly key: string
+  readonly kind: string
+  readonly data: unknown
+}
 
 /** One node's role inside the focus flow. */
 export type NodeClass = 'reply' | 'user' | 'runtime' | 'tail' | 'other'
@@ -47,7 +52,7 @@ export type GroupRow =
 export const SUMMARY_TOOL_NAME_LIMIT = 5
 
 /** Text block discriminant: an assistant-step with any text block is a reply. */
-function hasTextBlock(data: ChatConversationViewNode['data']): boolean {
+function hasTextBlock(data: unknown): boolean {
   if (typeof data !== 'object' || data === null) return false
   const blocks = (data as { blocks?: readonly unknown[] }).blocks
   if (!Array.isArray(blocks)) return false
@@ -55,8 +60,8 @@ function hasTextBlock(data: ChatConversationViewNode['data']): boolean {
     typeof block === 'object' && block !== null && (block as { kind?: unknown }).kind === 'text')
 }
 
-/** Reasoning presence on a text-less assistant-step (foldReasoning gate). */
-function hasReasoningBlock(data: ChatConversationViewNode['data']): boolean {
+/** Reasoning presence on a text-less assistant-step (focusReasoning gate). */
+function hasReasoningBlock(data: unknown): boolean {
   if (typeof data !== 'object' || data === null) return false
   const blocks = (data as { blocks?: readonly unknown[] }).blocks
   if (!Array.isArray(blocks)) return false
@@ -66,15 +71,15 @@ function hasReasoningBlock(data: ChatConversationViewNode['data']): boolean {
 
 /**
  * Classify one node by kind plus block content.
- * @param node - final business node.
+ * @param node - final chat node.
  * @param settings - focus settings (focusReasoning gates text-less reasoning steps).
  * @returns the node class.
  */
 export function classifyNode(
-  node: ChatConversationViewNode,
+  node: FocusNode,
   settings: Pick<ChatFocusSettings, 'focusReasoning'>,
 ): NodeClass {
-  switch (node.kind as ChatNodeKind) {
+  switch (node.kind) {
     case 'user':
     case 'steering':
       return 'user'
@@ -96,8 +101,8 @@ export function classifyNode(
  * @param node - the appended runtime node.
  * @returns the next summary (new references only when something changed).
  */
-export function updateSummary(prev: RuntimeSummary, node: ChatConversationViewNode): RuntimeSummary {
-  const think = (node.kind as ChatNodeKind) === 'assistant-step' && hasReasoningBlock(node.data)
+export function updateSummary(prev: RuntimeSummary, node: FocusNode): RuntimeSummary {
+  const think = node.kind === 'assistant-step' && hasReasoningBlock(node.data)
   const toolName = (node.data as { root?: { name?: string } } | null)?.root?.name
   const names = toolName !== undefined && toolName !== '' && !prev.toolNames.includes(toolName)
     ? [...prev.toolNames, toolName]
@@ -115,7 +120,7 @@ const EMPTY_SUMMARY: RuntimeSummary = { total: 0, toolCount: 0, thinkCount: 0, o
 
 /** Minimal node lookup the grouping engine needs (the chat snapshot's node store shape). */
 export interface NodeLookup {
-  get(key: string): ChatConversationViewNode | undefined
+  get(key: string): FocusNode | undefined
 }
 
 /** One pending run waiting for its following reply during the scan. */
@@ -130,7 +135,7 @@ type BuiltRow =
   | { readonly kind: 'node'; readonly nodeKey: string; readonly klass: 'user' | 'reply' | 'tail' | 'other' }
 
 /** Extract a reply's thinking blocks as run entries (streaming tail marked running). */
-function reasoningItemsOf(node: ChatConversationViewNode): RunItem[] {
+function reasoningItemsOf(node: FocusNode): RunItem[] {
   const data = node.data as { status?: unknown; blocks?: readonly unknown[] } | null
   if (data === null || typeof data !== 'object' || !Array.isArray(data.blocks)) return []
   const texts = data.blocks
@@ -157,7 +162,7 @@ function reasoningItemsOf(node: ChatConversationViewNode): RunItem[] {
  *   shorter runs stay expanded.
  * - always: every run folds.
  *
- * @param order - stable node key order from the conversation snapshot.
+ * @param order - stable node key order from the chat snapshot.
  * @param nodes - node store (get by key).
  * @param settings - focus settings (focusEnabled / focusKeepVisible / focusStrategy / focusReasoning).
  * @returns the group rows; when disabled, rows pass through in original order.

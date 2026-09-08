@@ -4,20 +4,20 @@
 // root-scoped, so real session data needs a v0.2 inject channel).
 
 import { memo, useLayoutEffect, useRef, useState } from 'react'
-import type { ObservableSnapshot } from '@deepseek-ai/dsh-client-runtime/client'
+import type { SnapshotStore } from '@deepseek-ai/dsh-client-store'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import { Modal } from '@deepseek-ai/dsh-client-ui-primitives'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
-import type { ConversationSettings } from '../../submission-settings.ts'
+import type { ChatSettings } from '../../chat-settings.ts'
 import {
   FOCUS_BG_POSITIONS, FOCUS_BUBBLE_BG_SIZES, FOCUS_BUBBLE_STYLES, FOCUS_STRATEGIES,
   type FocusBubbleBgSize, type FocusBubbleStyle, type FocusFoldStrategy,
-} from '../../submission-settings.ts'
+} from '../../chat-settings.ts'
 import type { ChatBubbleCustomStyle } from '../chat/bubbles/ChatBubble.tsx'
 import { RuntimeFoldBox, type RuntimeFoldBoxProps } from '../chat/bubbles/RuntimeFoldBox.tsx'
 import { ChatBubble } from '../chat/bubbles/ChatBubble.tsx'
 import { ImageCropper, compressImageDataUrl } from './ImageCropper.tsx'
-import type { ConversationKey } from '../locales.ts'
+import type { FocusKey } from './focus-locale.ts'
 import css from './ChatFocusSection.module.css'
 
 /** Max uploaded background-image file size (keeps the settings file sane). */
@@ -58,12 +58,12 @@ const BUBBLE_PRESETS: readonly BubblePreset[] = [
  *  A live slider draft overrides the stored overlay so the preview follows
  *  the thumb while dragging, before the commit writes the setting. */
 function previewCustom(
-  focus: ConversationSettings,
+  focus: ChatSettings,
   side: 'assistant' | 'user',
   overlayDraft: number | null,
 ): ChatBubbleCustomStyle {
   const prefix = side === 'assistant' ? 'focusBubble' : 'focusUserBubble'
-  const f = (suffix: string): string => focus[`${prefix}${suffix}` as keyof ConversationSettings] as string
+  const f = (suffix: string): string => focus[`${prefix}${suffix}` as keyof ChatSettings] as string
   const gradient = f('GradientFrom') !== ''
   return {
     bg: gradient ? 'transparent' : f('Bg'),
@@ -73,8 +73,8 @@ function previewCustom(
     bgImage: gradient
       ? `linear-gradient(${f('GradientAngle')}deg, ${f('GradientFrom')}, ${f('GradientTo') !== '' ? f('GradientTo') : f('GradientFrom')})`
       : f('BgImage'),
-    bgSize: focus[`${prefix}BgSize` as keyof ConversationSettings] as FocusBubbleBgSize,
-    bgPosition: focus[`${prefix}BgPosition` as keyof ConversationSettings] as 'top' | 'center' | 'bottom',
+    bgSize: focus[`${prefix}BgSize` as keyof ChatSettings] as FocusBubbleBgSize,
+    bgPosition: focus[`${prefix}BgPosition` as keyof ChatSettings] as 'top' | 'center' | 'bottom',
     overlay: overlayDraft === null ? f('Overlay') : String(overlayDraft),
     textColor: f('TextColor'),
     font: f('Font'),
@@ -110,15 +110,15 @@ function ColorField({ value, onChange }: {
 export interface ChatFocusSectionInjected {
   hooks: {
     /** Durable ChatFocus section bound as useFocusSettings. */
-    focusSettings: ObservableSnapshot<ConversationSettings>
+    focusSettings: SnapshotStore<ChatSettings>
   }
-  /** Write one scalar field of the conversation settings namespace. */
-  setFocusField: (field: string, value: unknown) => void
+  /** Write one scalar field of the Chat settings namespace. */
+  setFocusField: (field: keyof ChatSettings, value: unknown) => void
 }
 
 /** Full props of the ChatFocus settings section. */
 export type ChatFocusSectionProps =
-  PropsRuntime<'settings.section'> & InjectFace<ChatFocusSectionInjected> & PropsLocale<'conversation'>
+  PropsRuntime<'settings.section'> & InjectFace<ChatFocusSectionInjected> & PropsLocale<'chat-focus'>
 
 /** Sample runtime run for the appearance preview (root scope has no session seat). */
 const PREVIEW_RUN: Omit<RuntimeFoldBoxProps, 'renderItem' | 't' | 'defaultOpen' | 'summaryVisible' | 'strategySalt'> = {
@@ -200,7 +200,7 @@ function overlayStrength(value: string): number {
 }
 
 /** Readable label for the current overlay strength. */
-function overlayLabel(value: string, t: (key: ConversationKey, params?: Record<string, string>) => string): string {
+function overlayLabel(value: string, t: (key: FocusKey, params?: Record<string, string>) => string): string {
   const strength = overlayStrength(value)
   if (strength === 0) return t('focus.overlay.none')
   return strength < 0
@@ -215,7 +215,7 @@ function PresetSelect({ presets, value, emptyKey, customKey, onChange, t }: {
   emptyKey: string
   customKey: string
   onChange: (next: string) => void
-  t: (key: ConversationKey) => string
+  t: (key: FocusKey) => string
 }) {
   const matched = presets.includes(value)
   return (
@@ -229,10 +229,10 @@ function PresetSelect({ presets, value, emptyKey, customKey, onChange, t }: {
     >
       {presets.map(preset => (
         <option key={preset || 'default'} value={preset}>
-          {preset === '' ? t(emptyKey as ConversationKey) : preset}
+          {preset === '' ? t(emptyKey as FocusKey) : preset}
         </option>
       ))}
-      {!matched && value !== '' && <option value="__custom__">{t(customKey as ConversationKey)}</option>}
+      {!matched && value !== '' && <option value="__custom__">{t(customKey as FocusKey)}</option>}
     </select>
   )
 }
@@ -241,7 +241,7 @@ function PresetSelect({ presets, value, emptyKey, customKey, onChange, t }: {
 function FontSelect({ value, onChange, t }: {
   value: string
   onChange: (next: string) => void
-  t: (key: ConversationKey) => string
+  t: (key: FocusKey) => string
 }) {
   const matched = FONT_PRESETS.find(preset => preset.value === value)
   return (
@@ -254,7 +254,7 @@ function FontSelect({ value, onChange, t }: {
       }}
     >
       {FONT_PRESETS.map(preset => (
-        <option key={preset.id} value={preset.id}>{t(`focus.font.${preset.id}` as ConversationKey)}</option>
+        <option key={preset.id} value={preset.id}>{t(`focus.font.${preset.id}` as FocusKey)}</option>
       ))}
       {matched === undefined && value !== '' && <option value="__custom__">{t('focus.font.custom')}</option>}
     </select>
@@ -269,7 +269,7 @@ function GradientEditor({ from, to, angle, onChangeFrom, onChangeTo, onChangeAng
   onChangeFrom: (next: string) => void
   onChangeTo: (next: string) => void
   onChangeAngle: (next: string) => void
-  t: (key: ConversationKey) => string
+  t: (key: FocusKey) => string
 }) {
   const enabled = from !== ''
   return (
@@ -306,7 +306,7 @@ function GradientEditor({ from, to, angle, onChangeFrom, onChangeTo, onChangeAng
 function BgImageField({ value, onChange, t }: {
   value: string
   onChange: (next: string) => void
-  t: (key: ConversationKey) => string
+  t: (key: FocusKey) => string
 }) {
   const fileRef = useRef<HTMLInputElement>(null)
   const [cropSource, setCropSource] = useState<string | null>(null)
@@ -359,7 +359,7 @@ function BgImageField({ value, onChange, t }: {
         open={cropSource !== null}
         onClose={() => setCropSource(null)}
         title={t('focus.cropTitle')}
-        closeLabel={t('details.close')}
+        closeLabel={t('focus.close')}
       >
         {cropSource !== null && (
           <ImageCropper
@@ -379,16 +379,16 @@ function BgImageField({ value, onChange, t }: {
 /** Full per-side bubble editor (assistant or user) with the shared knobs. */
 function BubbleSideEditor({ side, focus, setField, overlayDraft, onOverlayDraft, t }: {
   side: 'assistant' | 'user'
-  focus: ConversationSettings
-  setField: (field: keyof ConversationSettings, value: unknown) => void
+  focus: ChatSettings
+  setField: (field: keyof ChatSettings, value: unknown) => void
   /** Live slider value while dragging (preview only, not yet persisted). */
   overlayDraft: number | null
   /** Update the live slider draft (no settings write). */
   onOverlayDraft: (next: number | null) => void
-  t: (key: ConversationKey) => string
+  t: (key: FocusKey) => string
 }) {
   const prefix = side === 'assistant' ? 'focusBubble' : 'focusUserBubble'
-  const field = (suffix: string): keyof ConversationSettings => `${prefix}${suffix}` as keyof ConversationSettings
+  const field = (suffix: string): keyof ChatSettings => `${prefix}${suffix}` as keyof ChatSettings
   const value = (suffix: string): string => focus[field(suffix)] as string
   const set = (suffix: string, next: unknown): void => setField(field(suffix), next)
   const commitOverlay = (): void => {
@@ -425,7 +425,7 @@ function BubbleSideEditor({ side, focus, setField, overlayDraft, onOverlayDraft,
           >
             {BUBBLE_PRESETS.map(preset => (
               <option key={preset.id || 'default'} value={preset.id}>
-                {t((preset.id === '' ? 'focus.preset.default' : `focus.preset.${preset.id}`) as ConversationKey)}
+                {t((preset.id === '' ? 'focus.preset.default' : `focus.preset.${preset.id}`) as FocusKey)}
               </option>
             ))}
             <option value="__custom__">{t('focus.preset.custom')}</option>
@@ -632,7 +632,7 @@ export const ChatFocusSection = memo(function ChatFocusSection({
   close, useFocusSettings, setFocusField, t,
 }: ChatFocusSectionProps) {
   const focus = useFocusSettings(value => value)
-  const setField = (field: keyof ConversationSettings, value: unknown): void => {
+  const setField = (field: keyof ChatSettings, value: unknown): void => {
     setFocusField(field, value)
   }
   // Live overlay slider drafts per side: dragging updates these (and thus the
@@ -679,7 +679,7 @@ export const ChatFocusSection = memo(function ChatFocusSection({
     >
       <div className={css.header}>
         <span className={css.headerTitle}>{t('focus.sectionLabel')}</span>
-        <button type="button" className={css.close} onClick={close}>{t('details.close')}</button>
+        <button type="button" className={css.close} onClick={close}>{t('focus.close')}</button>
       </div>
 
       {/* Top pane scrolls the grouped controls; the live sample below stays

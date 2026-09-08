@@ -1,8 +1,8 @@
 # dsh-chat-focus
 
-A dsh web conversation plugin that folds the **runtime activity** preceding each text reply (tool calls, thinking, retries, …) into expandable boxes, renders text replies as **chat bubbles**, and exposes a configurable settings panel. Distributed as an independent repository with **zero host source changes** (a bundle patch layer replaces the host `ui-conversation` row).
+A dsh web conversation plugin that folds the **runtime activity** preceding each text reply (tool calls, thinking, retries, …) into expandable boxes, renders text replies as **chat bubbles**, and exposes a configurable settings panel. Distributed as an independent repository with **zero host source changes** (a bundle patch layer disables the host `ui-chat` bubble row; the chat layer registers into the host `ui-conversation` engine and session shell).
 
-Implementation: a fork of the host `@deepseek-ai/dsh-client-ui-conversation` (rc.5 baseline) with a reworked chat domain (grouping engine / bubbles / fold boxes) and an extended settings schema.
+> **0.3.0 (2026-09-03):** migrated to the host **0.1.2-alpha.5** contract via route B — the fork is now a chat-layer plugin riding the host `ui-conversation` engine and session shell, replacing the host `ui-chat` bubble row. All fork-specific features (fold boxes / grouping / bubble skins / settings) are back. Migration record: docs/experience/migration-20260903-host-0.1.2-alpha.5-route-B.md.
 
 [中文 README](./README.md)
 
@@ -143,19 +143,20 @@ Settings fields (namespace `ui-conversation`, extended schema; already allowed b
 ## Build
 
 ```sh
-pnpm install         # host repo (rc.5 baseline) as cross-repo workspace members for @deepseek-ai/* deps
+pnpm install         # host repo (0.1.2-alpha.5 baseline) as cross-repo workspace members for @deepseek-ai/* deps
 pnpm run typecheck   # tsc --noEmit (type contracts from host lib/types artifacts)
 pnpm run bundle      # tsdown: lib/index.js (node half) + lib/client.js (browser bundle)
 pnpm run test:engine # grouping engine behavior checks (tsx)
 ```
 
-> Dev note: `pnpm-workspace.yaml` lists `../deepseek-harness/packages/*/*` and `../deepseek-harness/vendor/*` as workspace members (exact rc.5 contract). If pnpm does not materialize node_modules across parent directories, run `node scripts/setup-junctions.mjs` to link build deps by hand. **Never** run pnpm commands here that could rewrite the host node_modules.
+> Dev note: `pnpm-workspace.yaml` lists `../deepseek-harness/packages/*/*` and `../deepseek-harness/vendor/*` as workspace members (exact 0.1.2-alpha.5 contract). If pnpm does not materialize node_modules across parent directories, run `node scripts/setup-junctions.mjs` to link build deps by hand. **Never** run pnpm commands here that could rewrite the host node_modules.
 
 ## Version pairing (upstream adaptation)
 
 | Host version | Fork version | Notes |
 |--------------|--------------|-------|
 | rc.5 (2026-08-16 baseline) | 0.2.0 | v0.2 baseline (full fold strategies, bg upload/crop/fit, fold-box virtualization) |
+| 0.1.2-alpha.5 (2026-09-02) | 0.3.0 | Route-B migration: the host removed `dsh-client-runtime`; the fork is now a chat layer (riding the `ui-conversation` engine row, replacing the `ui-chat` bubble row). Engine symbols moved to the `dsh-client-store` seed word, event predicates to `dsh-session/surface`, and the fold box dropped its estimated-row-height virtualizer |
 | 0.1.1-rc.2 | 0.2.5 | Adapt to the attachment plugin split (`ImageGallery` etc. no longer exported from the platform module table): user bubbles moved onto the SAME `ChatBubble` pipeline as assistant replies; message images / composer attachments now flow through the `conversation.message.images` / `conversation.input.attachments` slots; ported the `referenceLabels` projection and the new reference-chip styling |
 
 When the host upgrades:
@@ -169,7 +170,6 @@ The host is pre-release (contracts may drift). If adaptation cost exceeds mainte
 ## Known limitations (v0.2)
 
 - The settings preview uses built-in sample data (the section seat is root-scoped; real-session preview is deferred per feedback)
-- Fold-box virtualization uses an estimated row height (fixed 56px spacing); measured row-height calibration is v0.3 work
 - Font presets rely on system fonts: KaiTi/SimSun/SimHei ship with Windows and macOS but may be missing on Linux (falls back to the system default)
 
 ## License

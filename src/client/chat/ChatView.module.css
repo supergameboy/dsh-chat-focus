@@ -1,8 +1,3 @@
-/* Chat flow: one 16px rhythm everywhere through the column gap. Input
-   padding cap rides the skeleton. Under
-   `[data-conversation-scroll]` the column host owns overflow and this view
-   is ordinary flow (see ConversationRoot active-phase rules). */
-
 .root {
   position: relative;
   display: flex;
@@ -18,6 +13,11 @@
   /* Sides = composer clearance + 16px: on narrow viewports the transcript
      stays exactly 32px narrower than the input card (the shared width rule). */
   padding: 16px calc(var(--dsh-composer-side-clearance) + 16px);
+  /* Inline-size query container: wide markdown tables size their breakout
+     against this box's content width (100cqw in AssistantMarkdown's
+     md-table-wide rule) — the CSS stand-in for deepsuite chat's JS-measured
+     --dsl-virtual-list-width. */
+  container-type: inline-size;
 }
 
 :global([data-conversation-scroll]) .root {
@@ -41,13 +41,26 @@
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 16px;
 }
 
-/* Settled-flow identity boundary. It is neutral today and becomes the natural
+/* `hidden="until-found"` retains a zero-height box so browser find can reveal
+   its subtree. Direct Chat Node Seats and auxiliary rows share one flow;
+   hidden and empty Seats do not contribute spacing. */
+.column > :not([hidden]):not(.flowItem:empty)
+  ~ :not([hidden]):not(.flowItem:empty) {
+  margin-top: var(--dsh-chat-flow-gap, 16px);
+}
+
+/* Settled-flow identity boundary. It is neutral until it becomes the natural
    measurement/mount unit for a virtualizer without changing the column gap. */
 .flowItem {
   min-width: 0;
+}
+
+/* A closed process reads as one summary immediately followed by its answer.
+   Expanded process rows return to the ordinary 16px rhythm. */
+.flowItem[data-turn-process-answer] {
+  --dsh-chat-flow-gap: 8px;
 }
 
 /* A keyed renderer may intentionally decline its row after dispatch (the
@@ -71,8 +84,15 @@
   flex: none;
   display: inline-flex;
   align-items: center;
-  height: 26px;
+  height: calc(26px + var(--dsh-content-font-delta, 0px));
   font: var(--dsw-font-s-strong-14);
+  /* The status line reads at the body size: the fixed 14 token supplies the
+     family/weight, the axis supplies the size. At default that is 14px text
+     on a 22px line inside a 26px row; both box heights shift by the same
+     delta, preserving the 8px (22 − 14) leading and the 4px (26 − 22) row
+     padding at every size. */
+  font-size: var(--dsh-content-font-size, 14px);
+  line-height: calc(22px + var(--dsh-content-font-delta, 0px));
   white-space: nowrap;
   background: linear-gradient(
     90deg,
@@ -94,6 +114,8 @@
 .turnStatusClock {
   margin-left: 8px;
   font: var(--dsw-font-xs-13);
+  font-size: var(--dsh-content-font-size-secondary, 13px);
+  line-height: calc(20px + var(--dsh-content-font-delta-secondary, 0px));
   font-weight: 400;
   font-variant-numeric: tabular-nums;
   color: var(--dsw-alias-label-caption);
@@ -116,14 +138,14 @@
 
 .hint {
   color: var(--dsw-alias-label-tertiary);
-  font-size: 12px;
-  line-height: 18px;
+  font-size: var(--dsh-content-font-size-secondary, 13px);
+  line-height: calc(18px + var(--dsh-content-font-delta-secondary, 0px));
 }
 
 .openError {
   color: var(--dsw-alias-state-error-primary);
-  font-size: 12px;
-  line-height: 18px;
+  font-size: var(--dsh-content-font-size-secondary, 13px);
+  line-height: calc(18px + var(--dsh-content-font-delta-secondary, 0px));
 }
 
 .older {
@@ -153,7 +175,9 @@
   position: sticky;
   bottom: 16px;
   /* Above the sticky composer (z-index 7) so the control stays clickable and
-     visible over the input card. */
+     visible over the input card. Exception: while an @/slash menu is open the
+     seat lifts to 9 (ui-conversation ConversationRoot) so the menu is never
+     covered by this control. */
   z-index: 8;
   height: 0;
   display: flex;
@@ -178,15 +202,22 @@
   height: 34px;
   margin-top: -34px;
   padding: 0;
-  border: 1px solid var(--dsw-alias-border-l2);
+  border: 0;
+  --dsw-elevation-stroke-color: var(--dsw-alias-border-l3);
   border-radius: 100px;
+  corner-shape: round;
   color: var(--dsw-alias-label-primary);
   background: var(--dsw-alias-button-floating-fill);
-  box-shadow: var(--dsw-shadow-lv2);
+  box-shadow: var(--dsw-elevation-panel);
   cursor: pointer;
   pointer-events: auto;
 }
 
 .toBottom:hover {
   background: var(--dsw-alias-button-floating-hover);
+}
+
+/* Host open-path refusal: same dialog family as the workspace folder error. */
+.modalAction {
+  min-width: 72px;
 }

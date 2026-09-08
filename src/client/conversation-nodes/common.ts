@@ -1,6 +1,6 @@
 import type {
   ConversationLocation, ConversationNodeContext,
-} from '@deepseek-ai/dsh-client-runtime/client'
+} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {
   ChatNode, ChatNodeDataMap, ChatNodeKind,
 } from '../contract/chat-nodes.ts'
@@ -14,6 +14,7 @@ import type {
 export const CHAT_SYNTHETIC_SEQ_OFFSETS = {
   interruptedAssistant: -0.9,
   interruptedFollowup: -0.8,
+  processControl: -0.1,
   maxTokensNotice: 0.05,
   finalizedFollowup: 0.1,
 } as const

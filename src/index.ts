@@ -1,23 +1,20 @@
-/** Host registration for browser conversation preferences. */
+/** Host registration for browser Chat preferences. */
 
 import type { Context } from '@deepseek-ai/cordis'
-import { settingsNamespace } from '@deepseek-ai/dsh-settings'
-import { CONVERSATION_SETTINGS_NAMESPACE, ConversationSettingsSchema } from './submission-settings.ts'
+import type {} from '@deepseek-ai/dsh-settings'
+import { CHAT_SETTINGS_NAMESPACE, ChatSettingsSchema } from './chat-settings.ts'
 
 export {
-  BUSY_ENTER_BEHAVIORS, BUSY_ENTER_FIELD, CONVERSATION_SETTINGS_NAMESPACE,
-  DEFAULT_BUSY_ENTER_BEHAVIOR, type BusyEnterBehavior, type ConversationSettings,
-} from './submission-settings.ts'
+  CHAT_SETTINGS_NAMESPACE, DEFAULT_TRANSCRIPT_VIEW_MODE, TRANSCRIPT_VIEW_FIELD,
+  TRANSCRIPT_VIEW_MODES, type ChatSettings, type TranscriptViewMode,
+} from './chat-settings.ts'
 
-/**
- * Register the durable conversation section when a settings provider exists.
- * @param ctx - Host context whose optional settings service owns the section.
- */
+/** Register the durable Chat settings section when a provider exists. */
 export function apply(ctx: Context): void {
   ctx.inject(['settings'], (settingsCtx) => {
     settingsCtx.settings.register(
-      settingsNamespace(CONVERSATION_SETTINGS_NAMESPACE),
-      ConversationSettingsSchema,
+      CHAT_SETTINGS_NAMESPACE,
+      ChatSettingsSchema,
     )
   })
 }

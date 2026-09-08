@@ -1,10 +1,11 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type {
-  ConversationMatch, ConversationNodeContext, ConversationNodeDefinition, TurnMaxTokensNode,
-} from '@deepseek-ai/dsh-client-runtime/client'
+  ConversationMatch, ConversationNodeContext, ConversationNodeDefinition,
+} from '@deepseek-ai/dsh-client-ui-conversation/client'
+import type { TurnMaxTokensNode } from '../contract/snapshot.ts'
 import { CHAT_SYNTHETIC_SEQ_OFFSETS, chatNode } from './common.ts'
 
-declare module 'dsh-chat-focus/client' {
+declare module '../contract/chat-nodes.ts' {
   interface ChatNodeDataMap {
     /** Turn ended by the per-request output-token cap. */
     'turn-max-tokens': TurnMaxTokensNode
@@ -78,5 +79,5 @@ export const turnMaxTokensDefinition: ConversationNodeDefinition<TurnMaxTokensSt
  * @param ctx - owning UI Conversation context.
  */
 export function registerTurnMaxTokensConversationNode(ctx: Context): void {
-  ctx.conversationEvents.register(turnMaxTokensDefinition)
+  ctx.uiConversation.events.register(turnMaxTokensDefinition)
 }

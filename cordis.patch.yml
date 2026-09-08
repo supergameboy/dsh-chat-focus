@@ -1,8 +1,10 @@
-# dsh-chat-focus bundle patch: replace the host ui-conversation row with the
-# fork (same slot contract, extended settings schema). Layers above may still
-# patch either row by id; removing this bundle from the profile restores the
-# host row automatically.
-- id: ui-conversation
+# dsh-chat-focus bundle patch (host 0.1.2-alpha.5 contract): the fork is the
+# chat layer riding the host ui-conversation row (engine + conversation shell,
+# which stays enabled). The host ui-chat bubble row is disabled so the fork's
+# own 'chat' view target/renderers are the only occupants. Layers above may
+# still patch either row by id; removing this bundle from the profile restores
+# the host chat row automatically.
+- id: ui-chat
   disabled: true
 - insert:
     - id: chat-focus

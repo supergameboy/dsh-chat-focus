@@ -1,7 +1,5 @@
-// CompactionCommandCard: the `/compact` command's running row and its
-// successful checkpoint disclosure. Outcomes without a checkpoint keep the
-// generic command card so no-history, cancellation, and failures retain their
-// complete handler-authored text.
+// Only a structured checkpoint uses the compaction marker; all other outcomes
+// retain the command's complete settlement text.
 
 import type { ChatViewSlotProps, CommandRowOwnerProps } from '../contract/slots.ts'
 import { CompactionItem } from './CompactionItem.tsx'
@@ -17,7 +15,7 @@ export function CompactionCommandCard({ node, compaction, t }: CompactionCommand
     return (
       <CompactionItem
         node={compaction}
-        title="compact"
+        title={t('message.compaction.commandTitle')}
         fallbackSummary={node.outcome?.text ?? null}
         t={t}
       />

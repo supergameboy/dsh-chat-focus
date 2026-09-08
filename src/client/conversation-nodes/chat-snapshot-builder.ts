@@ -1,29 +1,101 @@
 import type { Context } from '@deepseek-ai/cordis'
+import { notifySubscribers } from '@deepseek-ai/dsh-client-store'
 import type {
-  ChatConversationViewNode, ChatLocationNodeIndex, ChatNodeStore, ChatSnapshot,
-  ConversationLocation, ConversationNode, ConversationTimelineSnapshot,
-  ConversationViewBuilder, ConversationViewDefinition, LegacyConversationSlice,
-  PartialAssistant, RunningToolCall,
-} from '@deepseek-ai/dsh-client-runtime/client'
-import { sessionRecallLabels } from '@deepseek-ai/dsh-client-runtime/client'
-import type { ChatNode } from '../contract/chat-nodes.ts'
+  ConversationLocation, ConversationTimelineSnapshot, ConversationViewBuilder,
+  ConversationViewDefinition,
+} from '@deepseek-ai/dsh-client-ui-conversation/client'
+import type { ChatConversationViewNode, ChatNode } from '../contract/chat-nodes.ts'
 import { isRunningTool } from '../contract/chat-nodes.ts'
+import type {
+  ChatLocationNodeIndex, ChatNodeProcessSource, ChatNodeSource, ChatNodeStore, ChatSnapshot,
+  ChatTurnNavigationIndex, ChatTurnProcessPresentation, ConversationNode, LegacyConversationSlice,
+  PartialAssistant, RunningToolCall, TurnNavigationItem,
+} from '../contract/snapshot.ts'
+import { TURN_PROCESS_INDEPENDENT_KINDS } from '../contract/turn-process.ts'
+import { sessionRecallLabels } from './event-projection.ts'
+import { sameTurnNavigationItem, turnNavigationItem } from './turn-navigation.ts'
+import { ChatTurnProcessProjector } from './turn-process-presentation.ts'
 
 const EMPTY_KEYS: readonly string[] = []
 const EMPTY_TURNS: readonly number[] = []
+const EMPTY_ITEMS: readonly TurnNavigationItem[] = []
 const EMPTY_LIST: readonly never[] = []
 
 function sameReferences<T>(left: readonly T[], right: readonly T[]): boolean {
   return left.length === right.length && left.every((value, index) => value === right[index])
 }
 
+function cachedSource<Key, Source>(
+  sources: Map<Key, Source>,
+  key: Key,
+  create: () => Source,
+): Source {
+  let source = sources.get(key)
+  if (source === undefined) {
+    source = create()
+    sources.set(key, source)
+  }
+  return source
+}
+
+/* jscpd:ignore-start -- Chat Node sources keep publication state inside the keyed Chat store. */
+class MutableChatSource<Value> {
+  private readonly listeners = new Set<() => void>()
+  private published: Value
+
+  constructor(
+    private readonly read: () => Value,
+    private readonly label: string,
+  ) {
+    this.published = read()
+  }
+
+  readonly getSnapshot = (): Value => this.read()
+
+  readonly subscribe = (listener: () => void): (() => void) => {
+    this.listeners.add(listener)
+    return () => { this.listeners.delete(listener) }
+  }
+
+  publish(): void {
+    const next = this.getSnapshot()
+    if (this.published === next) return
+    this.published = next
+    notifySubscribers(this.listeners, this.label)
+  }
+}
+/* jscpd:ignore-end */
+
 class MutableChatNodeStore implements ChatNodeStore {
   private readonly byKey = new Map<string, ChatConversationViewNode>()
+  private readonly turnProcesses = new ChatTurnProcessProjector()
+  private readonly sources = new Map<string, MutableChatSource<ChatConversationViewNode | undefined>>()
+  private readonly processSources = new Map<string, MutableChatSource<ChatTurnProcessPresentation | undefined>>()
+  private readonly dirtyKeys = new Set<string>()
+  private readonly dirtyProcessKeys = new Set<string>()
   private valuesCache: readonly ChatConversationViewNode[] = EMPTY_LIST
   private valuesDirty = false
 
   get(key: string): ChatConversationViewNode | undefined {
     return this.byKey.get(key)
+  }
+
+  source(key: string): ChatNodeSource {
+    return cachedSource(this.sources, key, () => new MutableChatSource(
+      () => this.get(key),
+      `[ui-chat] node source ${key}`,
+    ))
+  }
+
+  processSource(key: string): ChatNodeProcessSource {
+    return cachedSource(this.processSources, key, () => new MutableChatSource(
+      () => this.process(key),
+      `[ui-chat] node process source ${key}`,
+    ))
+  }
+
+  process(key: string): ChatTurnProcessPresentation | undefined {
+    return this.turnProcesses.get(this.get(key) as ChatNode | undefined)
   }
 
   values(): readonly ChatConversationViewNode[] {
@@ -35,8 +107,20 @@ class MutableChatNodeStore implements ChatNodeStore {
   }
 
   replace(nodes: readonly ChatConversationViewNode[]): void {
+    const previous = new Map(this.byKey)
     this.byKey.clear()
-    for (const node of nodes) this.byKey.set(node.key, node)
+    for (const node of nodes) {
+      this.byKey.set(node.key, node)
+      if (previous.get(node.key) !== node) {
+        this.dirtyKeys.add(node.key)
+        this.dirtyProcessKeys.add(node.key)
+      }
+      previous.delete(node.key)
+    }
+    for (const key of previous.keys()) {
+      this.dirtyKeys.add(key)
+      this.dirtyProcessKeys.add(key)
+    }
     this.valuesCache = [...this.byKey.values()]
     this.valuesDirty = false
   }
@@ -46,9 +130,34 @@ class MutableChatNodeStore implements ChatNodeStore {
     for (const node of nodes) {
       if (this.byKey.get(node.key) === node) continue
       this.byKey.set(node.key, node)
+      this.dirtyKeys.add(node.key)
+      this.dirtyProcessKeys.add(node.key)
       changed = true
     }
     if (changed) this.valuesDirty = true
+  }
+
+  touchProcesses(turns: ReadonlySet<number>, locations: ChatLocationNodeIndex): void {
+    for (const turn of turns) {
+      for (const key of locations.getTurn(turn)) this.dirtyProcessKeys.add(key)
+    }
+  }
+
+  replaceProcesses(order: readonly string[], locations: ChatLocationNodeIndex): void {
+    this.touchProcesses(this.turnProcesses.replace(order, locations, this), locations)
+  }
+
+  updateProcesses(turns: ReadonlySet<number>, locations: ChatLocationNodeIndex): void {
+    this.touchProcesses(this.turnProcesses.update(turns, locations, this), locations)
+  }
+
+  publish(): void {
+    const dirty = [...this.dirtyKeys]
+    const dirtyProcesses = [...this.dirtyProcessKeys]
+    this.dirtyKeys.clear()
+    this.dirtyProcessKeys.clear()
+    for (const key of dirty) this.sources.get(key)?.publish()
+    for (const key of dirtyProcesses) this.processSources.get(key)?.publish()
   }
 }
 
@@ -123,6 +232,61 @@ function updateIndex<Key>(
   return next
 }
 
+/**
+ * Loaded-Turn rail projection accumulated alongside the node store: a
+ * structural change re-derives the Turn set, a content-only upsert re-derives
+ * only the Turns whose nodes moved, and the published array keeps its identity
+ * until an item actually changes. Renderers therefore consume final Turn data
+ * instead of scanning the loaded window per frame.
+ */
+class MutableTurnNavigationIndex implements ChatTurnNavigationIndex {
+  private current: readonly TurnNavigationItem[] = EMPTY_ITEMS
+  private byTurn = new Map<number, TurnNavigationItem>()
+
+  items(): readonly TurnNavigationItem[] {
+    return this.current
+  }
+
+  /** Re-derive the whole Turn set; runs only when the loaded structure moves. */
+  rebuild(
+    timeline: ConversationTimelineSnapshot,
+    locations: ChatLocationNodeIndex,
+    nodes: ChatNodeStore,
+  ): void {
+    const next: TurnNavigationItem[] = []
+    const byTurn = new Map<number, TurnNavigationItem>()
+    for (const turn of timeline.turnOrder) {
+      const derived = turnNavigationItem(turn, locations, nodes)
+      if (derived === undefined) continue
+      const previous = this.byTurn.get(turn)
+      const item = previous !== undefined && sameTurnNavigationItem(previous, derived) ? previous : derived
+      next.push(item)
+      byTurn.set(turn, item)
+    }
+    this.byTurn = byTurn
+    const unchanged = next.length === this.current.length
+      && next.every((item, index) => item === this.current[index])
+    if (!unchanged) this.current = next
+  }
+
+  /** Re-derive only the Turns a content-only upsert touched. */
+  touch(
+    turns: ReadonlySet<number>,
+    locations: ChatLocationNodeIndex,
+    nodes: ChatNodeStore,
+  ): void {
+    if (turns.size === 0) return
+    const next = this.current.map((item) => {
+      if (!turns.has(item.turn)) return item
+      const derived = turnNavigationItem(item.turn, locations, nodes)
+      if (derived === undefined || sameTurnNavigationItem(item, derived)) return item
+      this.byTurn.set(item.turn, derived)
+      return derived
+    })
+    if (next.some((item, index) => item !== this.current[index])) this.current = next
+  }
+}
+
 function stepKey(turn: number, step: number): string {
   return `${turn}:${step}`
 }
@@ -133,10 +297,120 @@ function locationCoordinates(location: ConversationLocation): { turn?: number; s
   return {}
 }
 
-function orderedVisible(nodes: readonly ChatConversationViewNode[]): ChatConversationViewNode[] {
-  return nodes
-    .filter(node => node.visibility === 'visible')
-    .sort((left, right) => left.anchorSeq - right.anchorSeq || left.key.localeCompare(right.key))
+function locationTurnStatus(location: ConversationLocation): string | undefined {
+  return location.kind === 'turn' || location.kind === 'step' ? location.turn.status : undefined
+}
+
+function processPresentationInputChanged(
+  previous: ChatNode | undefined,
+  next: ChatNode,
+  structural: boolean,
+): boolean {
+  if (structural || previous === undefined) return true
+  if (locationTurnStatus(previous.location) !== locationTurnStatus(next.location)) return true
+  if (previous.kind === 'turn-process' && next.kind === 'turn-process') {
+    return previous.data !== next.data
+  }
+  return previous.kind === 'assistant-step'
+    && next.kind === 'assistant-step'
+    && previous.data.step !== next.data.step
+}
+
+interface TurnProcessPresentation {
+  readonly control?: ChatNode<'turn-process'>
+  readonly openingHumanAnchor?: number
+  readonly earliestProcessAnchor?: number
+}
+
+function turnProcessPresentations(
+  nodes: readonly ChatConversationViewNode[],
+): ReadonlyMap<number, TurnProcessPresentation> {
+  const presentations = new Map<number, TurnProcessPresentation>()
+  for (const raw of nodes) {
+    const node = raw as ChatNode
+    if (node.kind === 'turn-process') {
+      presentations.set(node.data.turn, { ...presentations.get(node.data.turn), control: node })
+    }
+  }
+  for (const raw of nodes) {
+    const node = raw as ChatNode
+    const location = node.location
+    if (location.kind !== 'turn' && location.kind !== 'step') continue
+    const current: TurnProcessPresentation = presentations.get(location.turn.turn) ?? {}
+    if ((node.kind === 'user' || node.kind === 'steering')
+      && node.anchorSeq < (current.control?.data.controlAnchorSeq ?? Number.POSITIVE_INFINITY)) {
+      presentations.set(location.turn.turn, {
+        ...current,
+        openingHumanAnchor: Math.min(current.openingHumanAnchor ?? node.anchorSeq, node.anchorSeq),
+      })
+      continue
+    }
+    if (TURN_PROCESS_INDEPENDENT_KINDS.has(node.kind)) continue
+    presentations.set(location.turn.turn, {
+      ...current,
+      earliestProcessAnchor: Math.min(current.earliestProcessAnchor ?? node.anchorSeq, node.anchorSeq),
+    })
+  }
+  return presentations
+}
+
+interface PresentationPosition {
+  readonly anchor: number
+  readonly rank: number
+  readonly originalAnchor: number
+}
+
+function presentationPosition(
+  raw: ChatConversationViewNode,
+  presentations: ReadonlyMap<number, TurnProcessPresentation>,
+): PresentationPosition {
+  const node = raw as ChatNode
+  const location = node.location
+  if (location.kind !== 'turn' && location.kind !== 'step') {
+    return { anchor: node.anchorSeq, rank: 0, originalAnchor: node.anchorSeq }
+  }
+  const presentation = presentations.get(location.turn.turn)
+  if (presentation === undefined) {
+    return { anchor: node.anchorSeq, rank: 0, originalAnchor: node.anchorSeq }
+  }
+  const openingHumanAnchor = presentation.openingHumanAnchor
+  if (openingHumanAnchor !== undefined
+    && node.anchorSeq < openingHumanAnchor
+    && !TURN_PROCESS_INDEPENDENT_KINDS.has(node.kind)) {
+    return { anchor: openingHumanAnchor, rank: 2, originalAnchor: node.anchorSeq }
+  }
+  if (presentation.control !== undefined && node.key === presentation.control.key) {
+    return openingHumanAnchor === undefined
+      ? {
+        anchor: presentation.earliestProcessAnchor ?? node.anchorSeq,
+        rank: -1,
+        originalAnchor: node.anchorSeq,
+      }
+      : { anchor: openingHumanAnchor, rank: 1, originalAnchor: node.anchorSeq }
+  }
+  return { anchor: node.anchorSeq, rank: 0, originalAnchor: node.anchorSeq }
+}
+
+/**
+ * Order visible Chat Nodes without changing existing relative order as process
+ * eligibility changes. Opening human input precedes process candidates, while
+ * each synthetic process control sits between them.
+ * @param nodes - currently materialized Chat Nodes.
+ * @returns visible Nodes in presentation order.
+ */
+export function orderedVisibleChatNodes(
+  nodes: readonly ChatConversationViewNode[],
+): ChatConversationViewNode[] {
+  const visible = nodes.filter(node => node.visibility === 'visible')
+  const presentations = turnProcessPresentations(visible)
+  return visible.sort((left, right) => {
+    const leftPosition = presentationPosition(left, presentations)
+    const rightPosition = presentationPosition(right, presentations)
+    return leftPosition.anchor - rightPosition.anchor
+      || leftPosition.rank - rightPosition.rank
+      || leftPosition.originalAnchor - rightPosition.originalAnchor
+      || left.key.localeCompare(right.key)
+  })
 }
 
 function referenceMessageSeq(node: ChatConversationViewNode): number | undefined {
@@ -303,6 +577,8 @@ function legacyContribution(raw: ChatConversationViewNode): LegacyContribution {
         running: null,
       }
     case 'turn-tail':
+    case 'system-prompt':
+      // These known Chat rows intentionally make no legacy timeline contribution.
       return EMPTY_CONTRIBUTION
     default:
       return EMPTY_CONTRIBUTION
@@ -477,9 +753,12 @@ function partialContributionChanged(
 export class ChatSnapshotBuilder implements ConversationViewBuilder<ChatConversationViewNode, ChatSnapshot> {
   private readonly store = new MutableChatNodeStore()
   private readonly locations = new MutableChatLocationIndex()
+  private readonly navigation = new MutableTurnNavigationIndex()
   private readonly legacy = new LegacySliceBuilder()
   private readonly referenceLabels = new ReferenceLabelProjector()
   private order: readonly string[] = EMPTY_KEYS
+  /** Last published timeline: a Turn boundary can land without a new node. */
+  private timeline: ConversationTimelineSnapshot | null = null
   readonly empty: ChatSnapshot
 
   constructor() {
@@ -492,9 +771,14 @@ export class ChatSnapshotBuilder implements ConversationViewBuilder<ChatConversa
   }): ChatSnapshot {
     const nodes = this.referenceLabels.replace(input.nodes)
     this.store.replace(nodes)
-    this.order = orderedVisible(nodes).map(node => node.key)
+    this.order = orderedVisibleChatNodes(nodes).map(node => node.key)
     this.locations.rebuild(this.order, this.store)
-    return this.snapshot(input.timeline, this.legacy.replace(nodes, input.timeline))
+    this.store.replaceProcesses(this.order, this.locations)
+    this.navigation.rebuild(input.timeline, this.locations, this.store)
+    this.timeline = input.timeline
+    const snapshot = this.snapshot(input.timeline, this.legacy.replace(nodes, input.timeline))
+    this.store.publish()
+    return snapshot
   }
 
   apply(input: {
@@ -502,25 +786,42 @@ export class ChatSnapshotBuilder implements ConversationViewBuilder<ChatConversa
     readonly timeline: ConversationTimelineSnapshot
   }): ChatSnapshot {
     const upserts = this.referenceLabels.apply(input.upserts, this.store)
+    const processTurns = new Set<number>()
     let structural = false
     const contentOnly: ChatConversationViewNode[] = []
     for (const node of upserts) {
       const previous = this.store.get(node.key)
       const nodeStructural = previous === undefined
+        || previous.kind !== node.kind
         || previous.anchorSeq !== node.anchorSeq
         || previous.visibility !== node.visibility
         || locationIdentity(previous.location) !== locationIdentity(node.location)
       structural ||= nodeStructural
       if (!nodeStructural) contentOnly.push(node)
+      if (processPresentationInputChanged(previous as ChatNode | undefined, node as ChatNode, nodeStructural)) {
+        const previousTurn = previous === undefined ? undefined : locationCoordinates(previous.location).turn
+        const nextTurn = locationCoordinates(node.location).turn
+        if (previousTurn !== undefined) processTurns.add(previousTurn)
+        if (nextTurn !== undefined) processTurns.add(nextTurn)
+      }
     }
     this.store.upsert(upserts)
     if (structural) {
-      const next = orderedVisible(this.store.values()).map(node => node.key)
+      const next = orderedVisibleChatNodes(this.store.values()).map(node => node.key)
       this.order = sameReferences(this.order, next) ? this.order : next
       this.locations.rebuild(this.order, this.store)
     }
     this.locations.touch(contentOnly)
-    return this.snapshot(input.timeline, this.legacy.apply(upserts, input.timeline))
+    this.store.updateProcesses(processTurns, this.locations)
+    if (structural || input.timeline !== this.timeline) {
+      this.navigation.rebuild(input.timeline, this.locations, this.store)
+    } else {
+      this.navigation.touch(turnsOf(contentOnly), this.locations, this.store)
+    }
+    this.timeline = input.timeline
+    const snapshot = this.snapshot(input.timeline, this.legacy.apply(upserts, input.timeline))
+    this.store.publish()
+    return snapshot
   }
 
   private snapshot(
@@ -531,10 +832,21 @@ export class ChatSnapshotBuilder implements ConversationViewBuilder<ChatConversa
       order: this.order,
       nodes: this.store,
       locations: this.locations,
+      navigation: this.navigation,
       timeline,
       legacy,
     }
   }
+}
+
+/** Turns owning the given nodes, for the content-only navigation update. */
+function turnsOf(nodes: readonly ChatConversationViewNode[]): ReadonlySet<number> {
+  const turns = new Set<number>()
+  for (const node of nodes) {
+    const turn = locationCoordinates(node.location).turn
+    if (turn !== undefined) turns.add(turn)
+  }
+  return turns
 }
 
 function locationIdentity(location: ConversationLocation): string {
@@ -542,10 +854,11 @@ function locationIdentity(location: ConversationLocation): string {
   return `${location.kind}:${coordinates.turn ?? ''}:${coordinates.step ?? ''}`
 }
 
-/** Chat target factory contributed to the Runtime view registry. */
+/** Chat target factory contributed to the Conversation view registry. */
 export const chatViewDefinition: ConversationViewDefinition<ChatConversationViewNode, ChatSnapshot> = {
   target: 'chat',
   create: () => new ChatSnapshotBuilder(),
+  isActive: snapshot => snapshot.order.some(key => snapshot.nodes.get(key)?.kind !== 'command'),
 }
 
 /**
@@ -553,5 +866,5 @@ export const chatViewDefinition: ConversationViewDefinition<ChatConversationView
  * @param ctx - owning UI Conversation context.
  */
 export function registerChatConversationView(ctx: Context): void {
-  ctx.conversationViews.register(chatViewDefinition)
+  ctx.uiConversation.views.register(chatViewDefinition)
 }

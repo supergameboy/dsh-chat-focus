@@ -1,4 +1,5 @@
-/* Figma 10:2482: 24px Tool calls header, 4px gap, 141px code block cap. */
+/* Figma 10:2482: 24px Tool calls header, 4px gap, 141px code block cap.
+   SystemPromptRow reuses this sheet so both disclosures share one body. */
 
 .root {
   min-width: 0;
@@ -28,8 +29,8 @@
   min-width: 0;
   overflow: hidden;
   color: var(--dsw-alias-label-tertiary);
-  font-size: 14px;
-  line-height: 24px;
+  font-size: var(--dsh-content-font-size-secondary, 13px);
+  line-height: calc(24px + var(--dsh-content-font-delta, 0px));
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -40,17 +41,18 @@
   min-width: 0;
   overflow: hidden;
   color: var(--dsw-alias-label-tertiary);
-  font-size: 14px;
-  line-height: 24px;
+  font-size: var(--dsh-content-font-size-secondary, 13px);
+  line-height: calc(24px + var(--dsh-content-font-delta, 0px));
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .body {
   box-sizing: border-box;
-  width: calc(100% - 22px);
+  /* Indent under the title, which starts at leading (16 + delta) + gap 6. */
+  width: calc(100% - 22px - var(--dsh-content-font-delta, 0px));
   max-height: 141px;
-  margin: 4px 0 0 22px;
+  margin: 4px 0 0 calc(22px + var(--dsh-content-font-delta, 0px));
   overflow: auto;
   padding: 10px 16px 12px 12px;
   border: none;

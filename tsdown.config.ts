@@ -16,7 +16,7 @@ const CSS_VIRTUAL_PREFIX = '\0dsh-css:'
 const CSS_VIRTUAL_SUFFIX = '.mjs'
 
 /** Wire/type layers a client bundle may inline (mirrors host tsdown.client.ts). */
-export const INLINE_SAFE = /^@deepseek-ai\/dsh-(host-apiproxy|session|llm|tools|brand)(\/|$)/
+export const INLINE_SAFE = /^(?:@deepseek-ai\/dsh-(?:file-reference|session|llm|tools|brand|deque|typert-protocol|util-crypto|util-values|util-workspace-path)(?:\/|$)|@deepseek-ai\/dsh-token-meter\/client$|@deepseek-ai\/dsh-agent-presets\/display$)/
 
 /** Vendored framework libraries rescoped into @deepseek-ai. */
 const VENDORED_LIBRARY = /^@deepseek-ai\/(cosmokit|schemastery)(\/|$)/
@@ -25,21 +25,22 @@ const GENERATED_REMOTE = /^@deepseek-ai\/dsh-[a-z0-9]+(?:-[a-z0-9]+)*\/remote$/
 
 /**
  * Host platform modules (static copy of packages/client/web/src/platform.ts,
- * dsh 0.1.1-rc.2): the frozen module table entries resolved as externals at
- * runtime. The attachment presentation moved OUT of the table into its own
- * slot-based plugin — collaboration now goes through the
+ * dsh 0.1.2-alpha.5): the frozen module table entries resolved as externals at
+ * runtime. The client store engine rides the `@deepseek-ai/dsh-client-store`
+ * table word — the runtime package it replaced was removed in alpha.5, and the
+ * store is no longer a per-plugin external exemption. The attachment
+ * presentation moved OUT of the table into its own slot-based plugin —
+ * collaboration now goes through the
  * `conversation.message.images` / `conversation.input.attachments` slots.
  */
 export const PLATFORM_MODULES = [
   'react', 'react/jsx-runtime', 'react-dom', 'react-dom/client', '@deepseek-ai/cordis',
+  '@deepseek-ai/dsh-client-store',
   '@deepseek-ai/dsh-client-ui-slots',
   '@deepseek-ai/dsh-client-ui-primitives',
 ] as const
 
-/** Documented temporary exemption: the snapshot-store engine rides the runtime module. */
-const RUNTIME_STORE_EXEMPTION = '@deepseek-ai/dsh-client-runtime/client'
-
-export const CLIENT_EXTERNALS: readonly string[] = [...PLATFORM_MODULES, RUNTIME_STORE_EXEMPTION]
+export const CLIENT_EXTERNALS: readonly string[] = [...PLATFORM_MODULES]
 
 const REPOSITORY_ROOT = fileURLToPath(new URL('.', import.meta.url))
 
@@ -76,6 +77,20 @@ const clientConfig: UserConfig = {
   },
   noExternal: (id: string) => (CLIENT_EXTERNALS.includes(id) ? undefined : true),
   plugins: [{
+    // Route the inline wire modules to host SOURCE files: their package export
+    // maps advertise a `types` condition whose d.ts trees use `.ts`-suffixed
+    // imports that only resolve inside src layouts. (These specifiers must
+    // stay out of the tsconfig paths table for the same reason.)
+    name: 'dsh-wire-module-source',
+    resolveId(source: string) {
+      const wired = {
+        '@deepseek-ai/dsh-token-meter/client': 'E:/deepseek-harness/packages/llm/token-meter/src/client.ts',
+        '@deepseek-ai/dsh-session/surface': 'E:/deepseek-harness/packages/core/session/src/surface.ts',
+        '@deepseek-ai/dsh-util-workspace-path': 'E:/deepseek-harness/packages/util/workspace-path/src/index.ts',
+      }[source]
+      return wired ?? null
+    },
+  }, {
     name: 'dsh-client-bundle-purity',
     resolveId(source: string) {
       if (!source.startsWith('@deepseek-ai/')) return null

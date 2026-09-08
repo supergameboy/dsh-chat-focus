@@ -1,8 +1,8 @@
 # dsh-chat-focus
 
-dsh web 对话界面插件：将文本回复之前的**连续运行时信息**（工具调用、思考、重试等）收纳进可展开的折叠框，文本回复以**聊天气泡**呈现，设置面板可配置。独立仓库分发，**宿主源码零改动**（以 bundle 补丁层替换宿主 `ui-conversation` 行）。
+dsh web 对话界面插件：将文本回复之前的**连续运行时信息**（工具调用、思考、重试等）收纳进可展开的折叠框，文本回复以**聊天气泡**呈现，设置面板可配置。独立仓库分发，**宿主源码零改动**（以 bundle 补丁层停用宿主 `ui-chat` 气泡行，聊天层注册进宿主 `ui-conversation` 引擎与会话框架）。
 
-实现形式：复制宿主 `@deepseek-ai/dsh-client-ui-conversation`（rc.5 基线）并改造 chat 域（分组引擎 / 气泡 / 折叠框）+ 扩展设置 schema。
+> **0.3.0（2026-09-03）**：按宿主 **0.1.2-alpha.5** 契约完成路线 B 迁移——fork 收敛为聊天层插件，骑在宿主 `ui-conversation` 引擎与会话框架之上，替换宿主 `ui-chat` 气泡行；fork 专属特性（折叠/分组/气泡皮肤/设置页）全部回归。迁移记录见 docs/experience/migration-20260903-host-0.1.2-alpha.5-route-B.md。
 
 [English README](./README.en.md)
 
@@ -12,7 +12,7 @@ dsh web 对话界面插件：将文本回复之前的**连续运行时信息**�
 - **最近 N 个回复保持展开**：`focusKeepVisible` 语义为「保持展开的最近回复数」——最近 N 个聊天气泡对应的运行时信息默认展开，这 N 个之前的旧运行时信息全部折叠；流式中尚未有回复的活动也保持可见
 - **三种折叠策略**（设置页可选）：最近 N 个回复展开（keep-recent）/ 阈值折叠（条目数超过 N 才折叠，threshold）/ 全部折叠（always）
 - **聊天气泡**：助手回复左侧气泡（DeepSeek 鱼形 logo + HH:MM 时间，跨天显示日期），默认样式与用户气泡一致（DeepSeek 主题蓝、22px 圆角）；用户消息沿用宿主气泡
-- **折叠框摘要**：分类计数（工具/思考/其他）+ 去重工具名列表（最多 5 个）；展开状态按组持久化（localStorage，策略变化自动失效旧状态）；长运行时组**窗口化渲染**（虚拟列表，恒定渲染成本）
+- **折叠框摘要**：分类计数（工具/思考/其他）+ 去重工具名列表（最多 5 个）；展开状态按组持久化（localStorage，策略变化自动失效旧状态）；长运行时组在盒内独立滚动（不撑开外层会话流）
 - **高度自定义**（设置页『对话显示』→ 外观）：
   - 助手/用户气泡各 14 项：背景色、边框色、圆角、最大宽度、背景图片、背景适配（cover/contain/stretch）、文字颜色、字体、字号、内边距（任意 CSS 值）——两侧同构，均可独立设置
   - 字体下拉预设（真实存在、视觉差异明显）：跟随主题 / 楷体 KaiTi / 宋体 SimSun / 黑体 SimHei / 微软雅黑（≈默认）/ 衬线 Georgia / 等宽 Consolas
@@ -48,7 +48,7 @@ dsh plugin --profile web add "link:E:\dsh-chat-focus"            # 官方命令�
 # 重启 dsh web
 ```
 
-bundle 的 patch 层（`cordis.patch.yml`）由 loader 自动应用：宿主 `ui-conversation` 行被禁用，`chat-focus` 行挂载 fork；其他宿主插件（ui-tool、ui-plan、ui-commands 等）注册进 fork 声明的同名槽位，功能不变。
+bundle 的 patch 层（`cordis.patch.yml`）由 loader 自动应用：宿主 `ui-chat` 气泡行被禁用，`chat-focus` 行挂载 fork 并注册进宿主 `ui-conversation` 引擎的 `chat` 视图目标；其他宿主插件（ui-tool、ui-plan、ui-commands 等）注册进同名槽位，功能不变。
 
 **注意：安装之后需要重启dsh**
 
@@ -57,7 +57,7 @@ bundle 的 patch 层（`cordis.patch.yml`）由 loader 自动应用：宿主 `ui
 只使用官方命令：
 
 ```sh
-dsh plugin --profile web remove dsh-chat-focus   # 移除依赖 + bundle 层，重启后宿主 ui-conversation 行自动恢复
+dsh plugin --profile web remove dsh-chat-focus   # 移除依赖 + bundle 层，重启后宿主 ui-chat 行自动恢复
 ```
 
 官方命令之后的两处可选手动清理（均为惰性残留，不影响运行；是否清理自行决定）：
@@ -66,7 +66,7 @@ dsh plugin --profile web remove dsh-chat-focus   # 移除依赖 + bundle 层，�
 # 1) 仅 link: 方式安装才会留下的 node_modules 目录链接（加载器不会读取）：
 Remove-Item C:\Users\super\.dsh\profiles\web\node_modules\dsh-chat-focus -Force -Recurse
 
-# 2) settings.yaml 中 ui-conversation: 命名空间的 focus* 自定义字段（宿主 schema 放行未知键；
+# 2) settings.yaml 中 ui-chat: 命名空间的 focus* 自定义字段（fork 的 schema 提供这些键；
 #    保留它，重装后气泡自定义原样恢复）——按需手动删除对应行
 ```
 
@@ -143,19 +143,20 @@ node scripts/patch-skin-center.mjs --profile web
 ## 构建
 
 ```sh
-pnpm install        # 宿主仓库（rc.5 基线）作为跨仓库 workspace 成员提供 @deepseek-ai/* 依赖
+pnpm install        # 宿主仓库（0.1.2-alpha.5 基线）作为跨仓库 workspace 成员提供 @deepseek-ai/* 依赖
 pnpm run typecheck  # tsc --noEmit（类型契约来自宿主 lib/types 构建产物）
 pnpm run bundle     # tsdown：lib/index.js（node 半区）+ lib/client.js（浏览器 bundle）
 pnpm run test:engine # 分组引擎行为检查（tsx）
 ```
 
-> 开发环境说明：`pnpm-workspace.yaml` 将 `../deepseek-harness/packages/*/*` 与 `../deepseek-harness/vendor/*` 列为 workspace 成员（精确 rc.5 契约）。若 pnpm 因跨目录 workspace 未生成 node_modules，按 `node scripts/setup-junctions.mjs` 手工链接构建依赖。**不要**在本仓库运行会改写宿主 node_modules 的 pnpm 命令。
+> 开发环境说明：`pnpm-workspace.yaml` 将 `../deepseek-harness/packages/*/*` 与 `../deepseek-harness/vendor/*` 列为 workspace 成员（精确 0.1.2-alpha.5 契约）。若 pnpm 因跨目录 workspace 未生成 node_modules，按 `node scripts/setup-junctions.mjs` 手工链接构建依赖。**不要**在本仓库运行会改写宿主 node_modules 的 pnpm 命令。
 
 ## 版本配对（上游适配）
 
 | 宿主版本 | fork 版本 | 说明 |
 |---------|----------|------|
 | rc.5（2026-08-16 基线） | 0.2.0 | v0.2 基线（折叠策略全模式、背景图上传/裁剪/适配、折叠框虚拟化） |
+| 0.1.2-alpha.5（2026-09-02） | 0.3.0 | 路线 B 迁移：宿主删除 `dsh-client-runtime`，fork 收敛为聊天层（骑 `ui-conversation` 引擎行、替换 `ui-chat` 气泡行）；引擎符号改走 `dsh-client-store` 种子词，事件谓词改走 `dsh-session/surface`，折叠盒移除估算行高虚拟化 |
 | 0.1.1-rc.2 | 0.2.5 | 适配 attachment 插件化（`ImageGallery` 等原子不再从平台模块表导出）：用户气泡改走与助手同构的 `ChatBubble` 统一管线；消息图片/输入区附件改经 `conversation.message.images` / `conversation.input.attachments` 槽位；移植 `referenceLabels` 引用投影与新参考 chip 样式 |
 
 宿主升级后按以下流程适配：
@@ -166,10 +167,9 @@ pnpm run test:engine # 分组引擎行为检查（tsx）
 
 宿主处于 pre-release（契约随时可漂移）——若适配成本超出维护能力，备选方案（视图附加型，零手术纯插件行）见 `docs/design/solution-design-20260816-dsh-chat-focus-备选方案-视图附加型.md`。
 
-## 已知限制（v0.2）
+## 已知限制（v0.3）
 
 - 设置页预览为内置示例数据（settings.section 为 root scope，无会话数据通道；真实会话预览按反馈暂缓）
-- 折叠框虚拟化使用估算行高（固定 56px 行距），行高校准（ResizeObserver 实测）为 v0.3 项
 - 字体预设依赖系统字体：楷体/宋体/黑体在 Windows 与 macOS 均内置，Linux 可能缺失（缺字体时回退到系统默认）
 
 ## 许可证

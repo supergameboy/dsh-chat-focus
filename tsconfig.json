@@ -70,14 +70,31 @@
       // Non-client leaf modules (types/brand/checkpoint surfaces): no lib
       // build output, so resolve straight to host src files.
       "@deepseek-ai/dsh-invariants": ["../deepseek-harness/packages/runtime-diagnostics/invariants/lib/types/index.d.ts"],
+      "@deepseek-ai/dsh-util-workspace-path": ["../deepseek-harness/packages/util/workspace-path/lib/types/index.d.ts"],
       "@deepseek-ai/dsh-llm/types": ["../deepseek-harness/packages/llm/llm/lib/types/types.d.ts"],
       "@deepseek-ai/dsh-llm/brand": ["../deepseek-harness/packages/llm/llm/lib/types/brand.d.ts"],
+      "@deepseek-ai/dsh-llm/message": ["../deepseek-harness/packages/llm/llm/lib/types/message.d.ts"],
       "@deepseek-ai/dsh-llm-retry/types": ["../deepseek-harness/packages/llm/llm-retry/lib/types/types.d.ts"],
       "@deepseek-ai/dsh-commands/types": ["../deepseek-harness/packages/interaction/commands/lib/types/types.d.ts"],
       "@deepseek-ai/dsh-commands/brand": ["../deepseek-harness/packages/interaction/commands/lib/types/brand.d.ts"],
-      "@deepseek-ai/dsh-session/types": ["../deepseek-harness/packages/core/session/lib/types/types.d.ts"],
+      "@deepseek-ai/dsh-session/surface": ["../deepseek-harness/packages/core/session/lib/types/surface.d.ts"],
+      "@deepseek-ai/dsh-api-session-controller/client": [
+        "../deepseek-harness/packages/api/session-controller/lib/types/client",
+        "../deepseek-harness/packages/api/session-controller/src/client"
+      ],
+      "@deepseek-ai/dsh-api-session-controller/types": [
+        "../deepseek-harness/packages/api/session-controller/lib/types/types.d.ts"
+      ],
+      "@deepseek-ai/dsh-api-workspace-controller/client": [
+        "../deepseek-harness/packages/api/workspace-controller/lib/types/client",
+        "../deepseek-harness/packages/api/workspace-controller/src/client"
+      ],
+      "@deepseek-ai/dsh-api-workspace-controller/types": [
+        "../deepseek-harness/packages/api/workspace-controller/lib/types/types.d.ts"
+      ],
       "@deepseek-ai/dsh-session-stats/types": ["../deepseek-harness/packages/session/session-stats/lib/types/types.d.ts"],
       "@deepseek-ai/dsh-session-stats/client": ["../deepseek-harness/packages/session/session-stats/lib/types/client.d.ts"],
+      "@deepseek-ai/dsh-session-turn-outline/client": ["../deepseek-harness/packages/session/session-turn-outline/lib/types/client.d.ts"],
       "@deepseek-ai/dsh-token-meter/client": ["../deepseek-harness/packages/llm/token-meter/lib/types/client.d.ts"],
       "@deepseek-ai/dsh-compaction/checkpoint": ["../deepseek-harness/packages/compaction/compaction/lib/types/checkpoint.d.ts"],
       "@deepseek-ai/dsh-compaction/types": ["../deepseek-harness/packages/compaction/compaction/lib/types/types.d.ts"],

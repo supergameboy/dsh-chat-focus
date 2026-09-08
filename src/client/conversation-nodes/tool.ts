@@ -1,14 +1,14 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type {
   ConversationMatch, ConversationNodeContext, ConversationNodeDefinition,
-  RunningToolCall, ToolCallBlock, ToolResultNode,
-} from '@deepseek-ai/dsh-client-runtime/client'
-import { isAppendSurfaceEvent } from '@deepseek-ai/dsh-client-runtime/client'
+} from '@deepseek-ai/dsh-client-ui-conversation/client'
+import { isAppendSurfaceEvent } from '@deepseek-ai/dsh-session/surface'
 import type {} from '@deepseek-ai/dsh-tools/types'
 import type { ToolChatData } from '../contract/chat-nodes.ts'
+import type { RunningToolCall, ToolCallBlock, ToolResultNode } from '../contract/snapshot.ts'
 import { CHAT_SYNTHETIC_SEQ_OFFSETS, chatNode } from './common.ts'
 
-declare module 'dsh-chat-focus/client' {
+declare module '../contract/chat-nodes.ts' {
   interface ChatNodeDataMap {
     /** Root Tool lifecycle with recursively nested subcalls. */
     'tool-call': ToolChatData
@@ -45,7 +45,6 @@ function rootCall(match: ConversationMatch): RunningToolCall {
     turn: match.event.data.turn,
     step: match.event.data.step,
     time: match.event.time,
-    callView: match.view?.for === 'call' ? match.view.view : null,
     subCalls: [],
   }
 }
@@ -64,8 +63,6 @@ function rootResult(match: ConversationMatch, previous?: RunningToolCall): ToolR
     isError: result.isError === true,
     ...match.event.data.error === undefined ? {} : { error: match.event.data.error },
     meta: match.event.data.meta,
-    callView: previous?.callView ?? null,
-    resultView: match.view?.for === 'result' ? match.view.view : null,
     subCalls: [],
   }
 }
@@ -82,12 +79,12 @@ interface DispatchData {
 function childCall(match: ConversationMatch, data: DispatchData): RunningToolCall {
   return {
     callId: data.subCallId,
+    parentCallId: data.parentCallId,
     name: data.name,
     argsRaw: jsonArguments(data.arguments),
     turn: locationTurn(match),
     step: locationStep(match),
     time: match.event.time,
-    callView: null,
     subCalls: [],
   }
 }
@@ -98,12 +95,11 @@ function childResult(match: ConversationMatch, data: DispatchData, previous?: To
     seq: match.event.seq,
     time: match.event.time,
     callId: data.subCallId,
+    parentCallId: data.parentCallId,
     call: { name: data.name, argsRaw: jsonArguments(data.arguments) },
     callTime: previous?.time ?? null,
     content: data.content ?? [],
     isError: data.isError === true,
-    callView: null,
-    resultView: null,
     subCalls: [],
   }
 }
@@ -197,13 +193,12 @@ function projectBlock(
       seq: interruptedAt.seq + CHAT_SYNTHETIC_SEQ_OFFSETS.interruptedFollowup,
       time: interruptedAt.time,
       callId: block.callId,
+      ...block.parentCallId === undefined ? {} : { parentCallId: block.parentCallId },
       call: { name: block.name, argsRaw: block.argsRaw },
       callTime: block.time,
       content: [],
       isError: true,
       error: { name: 'Interrupted', code: 'interrupted' },
-      callView: block.callView,
-      resultView: null,
       subCalls: children,
     }
   projectedBlocks.set(block, { children, interruptionSeq, interruptionTime, value: projected })
@@ -273,5 +268,5 @@ export const toolDefinition: ConversationNodeDefinition<ToolState> = {
  * @param ctx - owning UI Conversation context.
  */
 export function registerToolConversationNode(ctx: Context): void {
-  ctx.conversationEvents.register(toolDefinition)
+  ctx.uiConversation.events.register(toolDefinition)
 }

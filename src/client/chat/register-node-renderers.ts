@@ -1,11 +1,13 @@
 import type { Context } from '@deepseek-ai/cordis'
-import { NS } from '../locales.ts'
+import { NS } from '../locale.ts'
 import { AssistantNodeView } from './AssistantNodeView.tsx'
 import { CommandNodeView, ManualCompactionNodeView } from './CommandNodeView.tsx'
 import {
   CompactionNodeView, ContextMessageNodeView, RetryNodeView, TurnErrorNodeView,
   TurnMaxTokensNodeView, UnknownNodeView, UserMessageNodeView,
 } from './MessageItem.tsx'
+import { SystemPromptNodeView } from './SystemPromptRow.tsx'
+import { TurnProcessNodeView } from './TurnProcessNodeView.tsx'
 import { TurnTailNodeView } from './TurnTailNodeView.tsx'
 
 /**
@@ -19,6 +21,8 @@ export function registerChatNodeRenderers(ctx: Context): void {
     { name: 'conversation.chat.node', key: 'steering', locale: NS }, UserMessageNodeView))
   ctx.slots.inject('conversation.chat.node', () => ctx.slots.register(
     { name: 'conversation.chat.node', key: 'context', locale: NS }, ContextMessageNodeView))
+  ctx.slots.inject('conversation.chat.node', () => ctx.slots.register(
+    { name: 'conversation.chat.node', key: 'system-prompt', locale: NS }, SystemPromptNodeView))
   ctx.slots.inject('conversation.chat.node', () => ctx.slots.register(
     { name: 'conversation.chat.node', key: 'assistant-step', locale: NS }, AssistantNodeView))
   ctx.slots.inject('conversation.chat.node', () => ctx.slots.register({
@@ -37,6 +41,8 @@ export function registerChatNodeRenderers(ctx: Context): void {
     { name: 'conversation.chat.node', key: 'turn-error', locale: NS }, TurnErrorNodeView))
   ctx.slots.inject('conversation.chat.node', () => ctx.slots.register(
     { name: 'conversation.chat.node', key: 'turn-max-tokens', locale: NS }, TurnMaxTokensNodeView))
+  ctx.slots.inject('conversation.chat.node', () => ctx.slots.register(
+    { name: 'conversation.chat.node', key: 'turn-process', locale: NS }, TurnProcessNodeView))
   ctx.slots.inject('conversation.chat.node', () => ctx.slots.register({
     name: 'conversation.chat.node',
     key: 'turn-tail',

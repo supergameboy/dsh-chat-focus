@@ -7,7 +7,7 @@
 | 模块ID | M2 |
 | 创建日期 | 2026-08-17 21:55 |
 | 模块类型 | UI 设计（渲染组件）+ 方案轨道（渲染路径） |
-| 状态 | 定稿（v1.2.0 修订：适配 v0.2.5 双侧统一 ChatBubble 管线） |
+| 状态 | 定稿（v1.2.0 修订：适配 v0.2.5 双侧统一 ChatBubble 管线；v1.3.0 修订：border-image 语法与 padding 澄清、描边/圆角让位、帧池共享、LRU 钉住衔接、毛玻璃叠加验证点） |
 | 上游 | M1（SkinStore 接口）；总规划 §2（border-image 动图结论）；v0.2.5 统一管线（MessageItem/预览 → ChatBubble role） |
 
 ---
@@ -57,9 +57,9 @@ flowchart TD
 ## 3. 路径1：nine-patch（静态图）
 
 效果要求：
-- `.content` 应用 `border-image: url(<objectUrl>) fill <t> <r> <b> <l> stretch`；slice 值来自 manifest.slices（源图像素）；
-- 内容 padding = slices 值（border-image 边宽即内边距），用户 padding 字段被接管（决策 2.5）；
-- 圆角：border-image 不响应 border-radius——由素材自带圆角呈现（QQ 同款做法）；文档向制作器明示「圆角画进图里」；
+- `.content` 应用 `border-image: url(<objectUrl>) <t> <r> <b> <l> fill stretch`（CSS 语法中 `fill` 必须位于 slice 值之后）；slice 值来自 manifest.slices（源图像素）；
+- 内容内缩完全由 border-image 边宽承担（slice 为 px 时边宽默认 = slice 值）：激活时 `.content` 的 padding 变量置 0，**避免「边宽 + padding」双重内缩**；用户 padding 字段让位（决策 2.5）；描边与圆角字段一并向皮肤让位（控件禁用并提示，总规划 §6 让位清单 v1.3.0 扩展）——描边与圆角均由素材呈现；
+- 制作器文案向用户明示「圆角画进图里」（border-image 不响应 border-radius，见上条让位规则）；
 - **气泡尾巴**：尾巴属于素材的一部分，须**完整落在某一条边切片（通常底边）内**，否则中段拉伸会把尾巴拉变形；该约束写入 M3 制作器的标记指引与保存校验（M3 §5）；
 - 失败降级：图片解码失败 → 回退无皮肤样式 + console 警告（不白屏，错误边界兜底）。
 
@@ -75,7 +75,7 @@ DOM 结构（效果描述）：
 
 - animated-image：`<img src=objectUrl>` 一枚，浏览器原生播放 GIF/APNG/WebP；`object-fit` = manifest.fit 映射（cover→cover、contain→contain、**stretch→fill**；manifest 枚举与设置域 FOCUS_BUBBLE_BG_SIZES 保持一致，见总规划 §5.2）；
 - frame-sequence：帧引擎（决策 2.3/2.4）：
-  - 启动时预解码全部帧为 Image 对象（≤120 帧，解码后交 GPU 合成）；
+  - 帧解码池按 skinId **模块级共享**（SkinFramePool 单例 + 引用计数，v1.3.0）：首个实例预解码全部帧为 Image 对象（≤120 帧，解码后交 GPU 合成），同皮肤多气泡实例复用同一份位图——内存不随实例数翻倍；末个实例卸载后释放池；
   - rAF 循环按 `fps` 时间累积推进帧索引，帧容器换背景（`background-image` 指向预解码池）；
   - 暂停矩阵（决策 2.4）：视口外 / 页面隐藏 / `prefers-reduced-motion: reduce` → 停在首帧，恢复可见即续播；
 - 双侧统一集成（v0.2.5 起）：助手回复与用户消息行（`MessageItem`）都直接渲染 `<ChatBubble role>`；皮肤 chrome 接入 ChatBubble 的背景层位置（`.content` 单层背景让位于皮肤路径），不存在第二条用户侧注入链或包裹容器。
@@ -83,6 +83,8 @@ DOM 结构（效果描述）：
 ## 5. 半透明/遮罩与皮肤的叠加顺序（承接 L0-#2 与 #8）
 
 层级自下而上：**皮肤媒体层 → 背景色（rgba，皮肤激活时为 transparent）→ bgImage/渐变（让位）→ inset overlay 遮罩 → 文字内容**；整体 opacity 与 backdrop-filter 作用于气泡容器整体（含皮肤层）。即 M5 的三控件在皮肤激活时继续生效（毛玻璃作用于皮肤之上）。遮罩走独立 `SkinOverlayLayer`（z 序见总规划 §9 并入正案表），统一管线下双侧共用。
+
+> ⚠ **叠加验证点（v1.3.0）**：整体 opacity ≠ 100% 时 `.bubble` 形成 backdrop root，可能使 `.content` 的 backdrop-filter 采样范围退化为气泡内部而非页面背景——「毛玻璃作用于皮肤之上」的目标表现须经 M5 §3 的前置 spike 实测确认；若采样失效，按 M5 备选方案调整 blur 挂载层级。
 
 ## 6. 预览一致性
 
@@ -95,7 +97,7 @@ DOM 结构（效果描述）：
 | 场景 | 行为 |
 |------|------|
 | skinId 指向的皮肤被删除 | resolveSkin 返回 null → 无皮肤样式；已保存残留 id 由 M4「清除」按钮归位；**草稿态**引用被删皮肤时由 M4 删除联动清空草稿 skinId（M4 §5），预览同样按无皮肤降级 |
-| 资产对象 URL 失效（LRU 淘汰后组件仍挂载） | 组件持引用则 URL 不淘汰；防御性 onerror → 降级样式 |
+| 资产对象 URL 失效（LRU 淘汰后组件仍挂载） | 由 M1 钉住语义杜绝：组件挂载即 pin 所引 SkinRecord、卸载 unpin，LRU 仅淘汰未钉住条目；防御性 onerror → 降级样式兜底 |
 | 帧解码部分失败 | 已解码帧循环播放，缺帧跳过并计数，console 警告 |
 | OPFS 读取异常（临时锁/IO 错误） | 一次重试 → 降级无皮肤 + 警告；不阻塞聊天渲染（渲染层永不 await 阻塞首帧：先渲染无皮肤，资产就绪后补挂） |
 
@@ -103,4 +105,5 @@ DOM 结构（效果描述）：
 
 - 同时播放的动画气泡 ≤ 视口内数量（IntersectionObserver 天然限制）；
 - 帧引擎内存 = 帧数 × 帧位图；120 帧 512×256 PNG 序列 ≈ 60MB 解码位图上限——制作器保存时展示预估体积，超 10MB 警告（引导减帧/降分辨率，见 M3 §5）；
-- LRU 缓存 ≤8 皮肤（M1），覆盖双侧激活 + 预览 + 管理器浏览。
+- LRU 缓存 ≤8 皮肤（M1，钉住语义见 §7），覆盖双侧激活 + 预览 + 管理器浏览；
+- backdrop-filter 开销随视口内气泡数线性增长：blur 仅对视口内气泡生效（复用动画暂停矩阵的 IntersectionObserver），视口外不渲染模糊（与 M5 §3 性能预算一致）。

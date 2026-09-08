@@ -1,23 +1,26 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type {
   ConversationMatch, ConversationNodeContext, ConversationNodeDefinition, TurnLocation,
-} from '@deepseek-ai/dsh-client-runtime/client'
-import { isAppendSurfaceEvent, toAssistantBlocks } from '@deepseek-ai/dsh-client-runtime/client'
+} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-llm-retry/types'
+import { isAppendSurfaceEvent } from '@deepseek-ai/dsh-session/surface'
+import type { SessionEvent } from '@deepseek-ai/dsh-session/types'
+import { deriveTurnTokenUsage } from '@deepseek-ai/dsh-token-meter/client'
 import type {
   AssistantChatData, FinalAssistantChatData, TurnTailChatData,
 } from '../contract/chat-nodes.ts'
-import { deriveTurnMetrics } from '../chat/turn-metrics.ts'
+import { deriveTurnMetrics } from '../contract/turn-metrics.ts'
 import { CHAT_SYNTHETIC_SEQ_OFFSETS, chatNode } from './common.ts'
+import { toAssistantBlocks } from './event-projection.ts'
 
-declare module 'dsh-chat-focus/client' {
+declare module '../contract/chat-nodes.ts' {
   interface ChatNodeDataMap {
     /** Completed-turn actions and extension tail. */
     'turn-tail': TurnTailChatData
   }
 }
 
-declare module '@deepseek-ai/dsh-client-runtime/client' {
+declare module '@deepseek-ai/dsh-client-ui-conversation/client' {
   interface ConversationTurnDataMap {
     /** Closing Assistant and footer facts derived for this completed Turn. */
     'turn-tail': TurnTailChatData
@@ -34,6 +37,12 @@ interface StepEvidence {
   readonly finalized: boolean
 }
 
+function isSessionEvent(event: ConversationMatch['event']): event is SessionEvent {
+  return event.type !== 'chunkrow/text-chunks'
+    && event.type !== 'chunkrow/reasoning-chunks'
+    && event.type !== 'chunkrow/tool-call-chunks'
+}
+
 function hasTextAssistant(event: Parameters<ConversationNodeDefinition['match']>[0]): boolean {
   return event.type === 'assistant/message'
     && isAppendSurfaceEvent(event)
@@ -42,6 +51,11 @@ function hasTextAssistant(event: Parameters<ConversationNodeDefinition['match']>
 }
 
 function chunkHasText(event: Parameters<ConversationNodeDefinition['match']>[0]): boolean {
+  if (event.type === 'chunkrow/text-chunks') {
+    return event.data.texts.some(text => text.trim() !== '')
+  }
+  if (event.type === 'chunkrow/reasoning-chunks'
+    || event.type === 'chunkrow/tool-call-chunks') return false
   if (event.type !== 'assistant/chunk') return false
   const chunk = event.data.chunk
   if (chunk.type === 'text-delta') return chunk.text.trim() !== ''
@@ -56,10 +70,16 @@ function turnCoordinates(event: Parameters<ConversationNodeDefinition['match']>[
 } | undefined {
   if (event.type === 'assistant/message'
     || event.type === 'assistant/chunk'
+    || event.type === 'step/start'
+    || event.type === 'chunkrow/text-chunks'
+    || event.type === 'chunkrow/reasoning-chunks'
+    || event.type === 'chunkrow/tool-call-chunks'
     || event.type === 'step/end') {
     return { turn: event.data.turn, step: event.data.step }
   }
-  if (event.type === 'llm/retry') return { turn: event.data.turn, step: event.data.step }
+  if (event.type === 'llm/retry' || event.type === 'llm/retry-started') {
+    return { turn: event.data.turn, step: event.data.step }
+  }
   return undefined
 }
 
@@ -75,7 +95,10 @@ function closingAnchor(context: ConversationNodeContext<TurnTailState>): number 
     const coordinates = turnCoordinates(event)
     if (coordinates?.step === undefined) continue
     const previous = steps.get(coordinates.step) ?? { streamedText: false, finalized: false }
-    if (event.type === 'assistant/chunk') {
+    if (event.type === 'assistant/chunk'
+      || event.type === 'chunkrow/text-chunks'
+      || event.type === 'chunkrow/reasoning-chunks'
+      || event.type === 'chunkrow/tool-call-chunks') {
       steps.set(coordinates.step, {
         ...previous,
         streamedText: previous.streamedText || chunkHasText(event),
@@ -111,8 +134,9 @@ function hasText(data: AssistantChatData): data is FinalAssistantChatData {
 }
 
 function tailData(context: ConversationNodeContext<TurnTailState>): TurnTailChatData | null {
-  const end = context.state?.end
-    ?? context.matches.find(match => match.event.type === 'turn/end')
+  const end = context.state === undefined
+    ? context.matches.find(match => match.event.type === 'turn/end')
+    : context.state.end
   if (end?.event.type !== 'turn/end') return null
   const turn = turnLocation(context)
   if (turn === undefined) return null
@@ -137,6 +161,9 @@ function tailData(context: ConversationNodeContext<TurnTailState>): TurnTailChat
     }
   }
   const metrics = deriveTurnMetrics(finalized.map(candidate => candidate.finalNode)).get(end.event.data.turn)
+  const tokenUsage = context.start?.event.type === 'turn/start'
+    ? deriveTurnTokenUsage(context.matches.map(match => match.event).filter(isSessionEvent))
+    : undefined
   return {
     turn: end.event.data.turn,
     seq: end.event.seq,
@@ -145,6 +172,7 @@ function tailData(context: ConversationNodeContext<TurnTailState>): TurnTailChat
     branchUnavailable: closing === null || latestTranscriptSeq !== closing.finalNode.seq,
     ...metrics?.ttftMs === undefined ? {} : { ttftMs: metrics.ttftMs },
     ...metrics?.tokensPerSecond === undefined ? {} : { tokensPerSecond: metrics.tokensPerSecond },
+    ...tokenUsage === undefined ? {} : { tokenUsage },
   }
 }
 
@@ -192,5 +220,5 @@ export const turnTailDefinition: ConversationNodeDefinition<TurnTailState> = {
  * @param ctx - owning UI Conversation context.
  */
 export function registerTurnTailConversationNode(ctx: Context): void {
-  ctx.conversationEvents.register(turnTailDefinition)
+  ctx.uiConversation.events.register(turnTailDefinition)
 }

@@ -1,12 +1,23 @@
-import { memo, useMemo } from 'react'
+import { memo, useMemo, useSyncExternalStore } from 'react'
 import type { ChatNodeViewProps, TurnTailOwnerProps } from '../contract/slots.ts'
 import { AssistantMarkdown } from './AssistantMarkdown.tsx'
+import { ChatBubble } from './bubbles/ChatBubble.tsx'
+import { assistantBubbleCustom } from './bubbles/chrome.ts'
 
 /** Streaming, settled, and interrupted Assistant states share one keyed renderer instance. */
 export const AssistantNodeView = memo(function AssistantNodeView({
-  node, useTurnData, openFile, renderMessageImages, fileMentions, t,
+  node, useTurnData, openFile, renderMessageImages, fileMentions, chatFocus, t,
 }: ChatNodeViewProps<'assistant-step'>) {
   const data = node.data
+  // Only a reply (a step carrying prose) wears the bubble: text-less steps are
+  // runtime activity and render inside the fold box, where bubble chrome would
+  // be noise. The grouping engine classifies by the same text test.
+  const isReply = data.blocks.some(block => block.kind === 'text')
+  const focus = useSyncExternalStore(
+    chatFocus.subscribe,
+    () => chatFocus.getSnapshot(),
+    () => chatFocus.getSnapshot(),
+  )
   const turn = node.location.kind === 'turn' || node.location.kind === 'step'
     ? node.location.turn
     : undefined
@@ -20,14 +31,31 @@ export const AssistantNodeView = memo(function AssistantNodeView({
     () => owner === undefined ? undefined : fileMentions(owner),
     [fileMentions, owner],
   )
-  return (
+  // ChatFocus folds a reply's thinking blocks into its preceding runtime run,
+  // so a reply bubble suppresses its own reasoning. A text-less step is a
+  // runtime member: its thinking IS the activity and must stay visible inside
+  // the fold box (hiding it there reads as "activity missing").
+  const reasoningHidden = focus.focusEnabled && isReply
+  const markdown = (
     <AssistantMarkdown
       blocks={data.blocks}
       streaming={data.status === 'running'}
       interrupted={data.status === 'interrupted'}
       renderMessageImages={renderMessageImages}
+      reasoningHidden={reasoningHidden}
       mentions={mentions}
       t={t}
     />
+  )
+  if (!focus.focusBubbles || !isReply) return markdown
+  return (
+    <ChatBubble
+      role="assistant"
+      compact={focus.focusBubbleStyle === 'compact'}
+      time={data.time}
+      custom={assistantBubbleCustom(focus)}
+    >
+      {markdown}
+    </ChatBubble>
   )
 })
