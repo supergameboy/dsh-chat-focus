@@ -1,95 +1,79 @@
 # dsh-chat-focus
 
-A dsh web conversation plugin that folds the **runtime activity** preceding each text reply (tool calls, thinking, retries, …) into expandable boxes, renders text replies as **chat bubbles**, and exposes a configurable settings panel. Distributed as an independent repository with **zero host source changes** (a bundle patch layer disables the host `ui-chat` bubble row; the chat layer registers into the host `ui-conversation` engine and session shell).
+A dsh web conversation plugin: it folds the **runtime activity** preceding each reply (tool calls, thinking, retries, compaction, …) into expandable boxes, renders text replies as **chat bubbles**, and puts bubble looks and skins in the settings page.
 
-> **0.4.0 (2026-09-09):** **translucent bubbles** (whole-layer backdrop opacity + frosted glass) and the **bubble skin maker** (turn your own image / GIF / APNG / PNG sequence / video into a bubble backdrop — static art gets nine-slice, animated art renders as one layer, a stepped sprite, or a muted video layer), plus a settings page rebuilt as a **left tab rail with a pinned preview**. Design docs: docs/design/ (2026-09-09 bubble-skin increment set).
->
-> **0.3.0 (2026-09-03):** migrated to the host **0.1.2-alpha.5** contract via route B — the fork is now a chat-layer plugin riding the host `ui-conversation` engine and session shell, replacing the host `ui-chat` bubble row. All fork-specific features (fold boxes / grouping / bubble skins / settings) are back. Migration record: docs/experience/migration-20260903-host-0.1.2-alpha.5-route-B.md.
+Distributed as an independent repository with **zero host source changes**: a bundle patch layer disables the host `ui-chat` bubble row, and the chat layer registers into the host `ui-conversation` engine and session shell. Current version **0.4.0**, paired with host **0.1.2-alpha.5**.
+
+![Conversation: folded runtime rows + chat bubbles](https://raw.githubusercontent.com/supergameboy/dsh-chat-focus/master/docs/screenshots/conversation.png)
 
 [中文 README](./README.md)
 
+## Highlights
+
+- **Folded runtime activity** — tool calls, thinking, retries, context, commands and compaction before a reply collapse into one box whose summary reads "N activities · M tools · K thinking · …" with a deduplicated tool list; expand it in place.
+- **Chat bubbles** — assistant replies get a left bubble (DeepSeek fish logo + time), user messages keep the host bubble. Font size, font family, radius, backdrop, gradient, backdrop opacity, frosted glass and padding are all editable, per side.
+- **Translucent bubbles** — whole-layer backdrop opacity from 0 to 100% while text stays opaque, plus frosted-glass presets (weak / medium / strong) that blur what sits behind the bubble.
+- **Bubble skin maker** — use your own artwork as a bubble backdrop: static images get nine-slice geometry, GIF / APNG keep their native animation, PNG sequences and video can be baked into a sprite sheet, and video can also play directly. Five-step wizard with a live three-length preview.
+- **Reworked settings page** — a left tab rail (Basics / Folding / Bubble look / Skins / Advanced) with the form and a live preview beside it; both sides share one editor, with one-click copy to the other side.
+
 ## Features
 
-- **Folded runtime activity**: consecutive runtime nodes before each text reply (tool-call, thinking, retry, context, command, compaction, …) collapse into an expandable box; **thinking (think) blocks fold into the same box** — no separate row
-- **Keep the most recent N replies expanded**: `focusKeepVisible` means "replies kept expanded N" — the runtime runs of the most recent N reply bubbles render expanded; older runs fold. Live (streaming, no reply yet) activity stays visible
-- **Three fold strategies** (selectable in settings): Expand recent N replies (keep-recent) / Threshold fold (fold once entries exceed N) / Fold all (always)
-- **Chat bubbles**: assistant replies render as left-side bubbles (DeepSeek fish logo + HH:MM clock, calendar-aware); the default look mirrors the host user bubble (DeepSeek theme blue, 22px radius); user messages keep the host bubble
-- **Fold summary** (toggling keeps the summary row in place; following the tail re-pins to the latest): category counts (tools / thinking / other) plus a deduped tool-name list (up to 5); open/closed state persists per run in localStorage (invalidated automatically when the strategy changes); long runs scroll inside the box (the outer flow stays untouched)
-- **Deep customization** (Settings → Chat Display):
-  - Assistant and user bubbles each expose 16 symmetric knobs: background, border, radius, max width, background image, background fit, **backdrop opacity**, **frosted glass**, text color, font family, font size, padding
-  - **Translucent bubbles**: a backdrop-opacity slider (0–100%) fades the whole layer (color/image/gradient) while text stays opaque; frosted-glass presets blur whatever sits behind the bubble
-  - Font presets that exist on both Windows and macOS and differ visibly from the theme default: Follow theme / KaiTi / SimSun / SimHei / Microsoft YaHei (≈ default) / Georgia (serif) / Consolas (mono)
-  - Font-size presets: 12 / 14 / 16 / 18 / 20 / 24px (16px is the theme default)
-  - Background image supports **local upload + crop dialog** (drag/resize frame, canvas export; uploads auto-compressed ≤1200px, ≤2MB); values are wrapped in `url()` automatically so images always render
-  - Gradient editor: enable gradient background (start/end colors + angle); mutually exclusive with the background image (uploading an image turns the gradient off)
-  - 6 built-in color templates: Default / Sky / Mint / Gradient / Dark / Texture
-  - Per-side **Reset**; controls owned by an active skin are disabled with an explanation
-- **Bubble skin maker** (Settings → Chat Display → Skins):
-  - Five-step wizard with a pinned three-length live preview (short / medium / long)
-  - **Parameter-only skins**: the source step can skip media entirely and package just the style
-  - Sources: PNG / JPG / WebP / GIF / APNG / SVG; multiple PNGs become a frame sequence; MP4 / WebM videos
-  - **Geometry step**: **background fit** (cover / contain / stretch) + **focal point** (with cover, drag the frame over the part that must stay visible; the bubble always keeps that point in view) + radius + content padding
-  - GIF / APNG → native animation kept, one-layer rendering (radius clip + cover/stretch)
-  - Video → two routes: **bake frames into a sprite sheet** (default; small, no decode cost, `steps()` animation at runtime) or **use the file directly** (muted looping `<video>` layer that keeps the original quality and length and only decodes while the bubble is on screen)
-  - PNG sequences → frames baked into a **horizontal sprite sheet** (frame width / rate / count, with progress and cancel)
-  - **A skin is the existing bubble editor packaged**: the Look & text step edits the same controls the settings page uses (colour / gradient / border / opacity / glass / overlay / text colour / font / size), and applying a skin writes them into that side's settings together with the artwork id — everything stays editable afterwards. The skin itself only owns the artwork and its geometry (nine-slice / radius / padding)
-  - Library: 3 built-ins + your own; apply / rename / delete. Assets live in `~/.dsh/chat-focus/skins/` and are served through the host's authenticated `/api` route (with `Range` support, so video can seek and loop), so they survive site-data clearing and work across browsers on the same machine
-- **Settings page: left tab rail + pinned preview** — Basics / Folding / Bubble look / Skins / Advanced. On wide layouts the rail sits left, the form scrolls in the middle, and the live preview stays pinned on the right; on narrow layouts the rail turns horizontal and the preview can be collapsed
-  - **Bubble look** reuses one editor behind an assistant/user segmented switch and can **copy to the other side** in a single atomic write
-  - **Advanced** holds the bulk reset, the skin-library status, and the asset location
-- **Render error boundary**: a crashed row shows an error card instead of blanking the whole conversation; refresh recovers
+### Folded runtime activity
 
-## Screenshots
+Every run of consecutive runtime nodes before a text reply collapses into a `<details>` box, and **thinking is folded in too** instead of taking its own row.
 
-| Conversation: folded runtime activity + chat bubbles | Settings: split panel with pinned live preview |
+- **Three folding strategies** (settings → Folding): keep the last N replies open / threshold (fold only when a group exceeds N items) / always fold.
+- **Recent N replies stay open**: `focusKeepVisible` is the number of most recent replies whose runtime rows stay expanded; everything older folds away, and an in-flight stream with no reply yet stays visible.
+- **Summary row**: category counts plus up to five deduplicated tool names. The summary row does not jump when toggling, and a pinned-to-bottom view returns to the newest row automatically.
+- **Expanded state persists per group** (localStorage; changing the strategy invalidates stale state). Long groups scroll inside their own box instead of stretching the conversation column.
+
+### Chat bubbles and bubble looks
+
+![Bubble look: backdrop opacity / frosted glass / background image / live preview](https://raw.githubusercontent.com/supergameboy/dsh-chat-focus/master/docs/screenshots/appearance.png)
+
+The "Bubble look" tab edits one side at a time through an **Assistant / User** segmented switch, each side with the same set of options:
+
+- **Backdrop**: background color, backdrop opacity (0–100%, applied to color / image / gradient as one layer), frosted glass, background image (local upload with a crop overlay, or a URL), background fit (cover / contain / stretch), focus position, text-readability overlay, gradient (from / to / angle, mutually exclusive with a background image).
+- **Text**: color, font family (theme / KaiTi / SimSun / SimHei / Microsoft YaHei / Georgia / Consolas), size (12–24px), padding (any CSS value).
+- **Geometry**: corner radius, max width, border color, plus six one-click palettes (Default / Sky / Mint / Gradient / Dark / Texture).
+- **Copy to the other side** writes every setting of this side (skin included) to the other one atomically; each side also has **Reset**.
+- With a skin applied, the backdrop/radius/border controls grey out with an explanation — the artwork owns the shape while text styling stays editable.
+
+### Bubble skin maker
+
+![Bubble skin maker: slice & geometry with a three-length live preview](https://raw.githubusercontent.com/supergameboy/dsh-chat-focus/master/docs/screenshots/skin-maker.png)
+
+A five-step wizard — **Source → Prepare → Slice & geometry → Look & text → Save and apply** — with a live short/medium/long preview pinned on the right.
+
+| Source | Processing route |
 | --- | --- |
-| ![Conversation](https://raw.githubusercontent.com/supergameboy/dsh-chat-focus/master/docs/screenshots/conversation.png) | ![Settings](https://raw.githubusercontent.com/supergameboy/dsh-chat-focus/master/docs/screenshots/settings.png) |
+| PNG / JPG / WebP / SVG | Nine-slice editing (draggable guides, numeric fields, auto-estimate from content); art is normalized to ≤256px so slice ratios hold |
+| GIF / APNG | Native animation kept, painted as one layer (rounded crop + cover/stretch) |
+| Multiple PNGs | PNG sequence → horizontal sprite sheet (frame width / fps / frame count, with progress and cancel) |
+| MP4 / WebM | **Bake frames into a sprite sheet** (default: small, no decode cost) or **play the video directly** (muted looping `<video>` layer that decodes only while in view and pauses when it leaves) |
 
-## Settings guide
+- **Geometry step**: background fit, focus (drag the crop box to pin the part that must always stay visible), corner radius and content padding.
+- **A skin packages the editor you already have**: the look step styles the packaged look with the same bubble controls (backdrop color, gradient, border, opacity, frosted glass, overlay, text color, font, size). Applying a skin writes those values together with the skin id into that side's settings, and you can keep tweaking them afterwards under "Bubble look".
+- **Parameter-only skins**: choose "no artwork" in the source step to package styling alone with no asset file.
 
-Open **Settings** (top-right) → **Chat Display**. The page is a **left tab rail plus a pinned preview**: five tabs (Basics / Folding / Bubble look / Skins / Advanced), a scrolling form in the middle, and the live preview always visible on the right. On narrow layouts the rail turns horizontal and the preview collapses behind a header button.
+### Skin library
 
-### Basics
+![Skin library: built-ins plus your own skins](https://raw.githubusercontent.com/supergameboy/dsh-chat-focus/master/docs/screenshots/skins.png)
 
-- **Plugin switch**: off restores the original message order (no folding, no bubbles)
-- **Chat bubbles**: text replies render as bubbles; off restores the host rendering
-- **Bubble density**: Standard / Compact (both sides)
+- Three built-ins: **Soft blue / Glassmorphism / Midnight** (read-only).
+- Your own skins can be **applied** (assistant / user / both), **renamed** and **deleted**; deleting one that is in use clears the reference as well.
+- Assets and metadata live in `~/.dsh/chat-focus/skins/` (`index.json` plus `<id>.bin`) and are served through the host's authenticated `/api/chat-focus/skin-asset` route (with `Range` support so video can seek), cached long with a version stamp. They are shared across browsers on the same machine but do not travel with the settings file.
 
-### Folding
+### Settings page and robustness
 
-- **Fold strategy**: recent N replies / threshold / fold all
-- **Replies kept expanded N**, **fold boxes start expanded**, **fold summary**, **reasoning into fold**
-
-### Bubble look (assistant / user segmented switch, symmetric)
-
-- **Side being edited**: assistant / user segmented switch; **Copy to the other side** writes every setting from this side (skin included) onto the other in one atomic write
-- **Style source**: bubble skin (see below) / color template (Default / Sky / Mint / Gradient / Dark / Texture)
-- **Backdrop**: background color, **backdrop opacity** (0–100%, whole layer), **frosted glass** (off/light/medium/strong), background image (upload & crop, or URL), fit, crop alignment, gradient, readability overlay
-- **Text**: color, font family, font size, padding
-- **Geometry**: corner radius, max width, border color
-- **Reset** clears every custom value for that side
-- **Skin takeover**: with a skin applied, background/radius/border controls are disabled with an explanation — the artwork defines the shape. Text color stays adjustable (used when the skin does not set one).
-
-### Skins
-
-- **Make a skin**: a five-step wizard (Source → Prepare → Slice & geometry → Look & text → Save & apply) with a pinned three-length live preview
-  - Sources: PNG / JPG / WebP / GIF / APNG / SVG; multiple PNGs become a frame sequence; MP4 / WebM videos
-  - Static images: nine-slice using the same interaction as the backdrop cropper (movable center frame + per-edge drag + numeric inputs + “Estimate from artwork”); artwork is normalized to ≤256px so slice numbers stay display-sized
-  - GIF / APNG: native animation kept, drawn as one layer (radius + cover/stretch)
-  - Video: bake frames into a sprite sheet (default) or use the file directly as a muted looping layer
-  - PNG sequences: frames are baked into a horizontal sprite sheet (frame width / rate / count, with progress and cancel)
-- **Library**: 3 built-ins (Soft blue / Glass / Night) plus your own skins; apply to assistant / user / both, rename or delete custom ones
-- Skin assets live in `~/.dsh/chat-focus/skins/` (`index.json` + `<id>.bin`) and are served by the host through the authenticated `/api/chat-focus/skin-asset` route with immutable versioned caching and `Range` support (so video skins can seek and loop). Without a host `connection` service the library reports unavailable while inline background images keep working.
-
-### Advanced
-
-- **Skin library status**: connected or not, how many self-made skins, the failure reason, and a retry button
-- **Skin asset location**: `~/.dsh/chat-focus/skins/`
-- **Reset all settings**: clears every bubble-look, skin, and folding customisation in one atomic write (confirmed first)
+- Settings live under **Settings → 对话显示 (Conversation display)**, with five tabs: **Basics / Folding / Bubble look / Skins / Advanced**. On wide layouts the rail and preview stay put while the form scrolls; below 860px of available width the rail turns horizontal and the preview collapses.
+- **Basics**: plugin switch, chat-bubble switch, bubble density (default / compact).
+- **Advanced**: skin-library connection status and asset directory, plus **reset all settings** (one atomic write, with confirmation).
+- **Render error boundary**: a row that fails to render shows an error card instead of blanking the panel; a refresh recovers.
 
 ## Install
 
-Always use the host's official plugin command, `dsh plugin --profile <name> <pnpm args...>` (pnpm forwarding + automatic reconciliation of dependencies that declare `dsh.bundle` into `dsh.profile.bundles`). This project ships no wrapper scripts and needs none.
+Always through the host's official plugin command, `dsh plugin --profile <name> <pnpm args...>` (a pnpm pass-through that also adds packages declaring `dsh.bundle` to the `dsh.profile.bundles` layer list). This project ships no wrapper scripts and needs none.
 
 From npm (recommended):
 
@@ -97,113 +81,131 @@ From npm (recommended):
 dsh plugin --profile web add dsh-chat-focus
 ```
 
-Local development (official command against the local checkout):
+Local development:
 
 ```sh
-pnpm run bundle                                                  # build lib/client.js first
-dsh plugin --profile web add "link:E:\dsh-chat-focus"            # official command, auto bundle layer
-# restart dsh web
+pnpm run bundle                                          # build lib/client.js first
+dsh plugin --profile web add "link:E:\dsh-chat-focus"    # official command, adds the bundle layer
 ```
 
-The bundle's patch layer (`cordis.patch.yml`) is applied by the loader automatically: the host `ui-conversation` row is disabled and the `chat-focus` row mounts the fork; all other host plugins (ui-tool, ui-plan, ui-commands, …) keep registering into the fork's identically-named slots.
+The bundle's patch layer (`cordis.patch.yml`) is applied by the loader: the host `ui-chat` bubble row is disabled and a `chat-focus` row mounts this plugin into the host `ui-conversation` engine's `chat` view target. Other host plugins (ui-tool, ui-plan, ui-commands, …) keep registering into the same slots and behave as before.
 
 **Note: restart dsh after installing.**
 
 ## Uninstall
 
-The official command only:
+Use the official command only:
 
 ```sh
-dsh plugin --profile web remove dsh-chat-focus   # removes the dependency + bundle layer; the host ui-conversation row restores after restart
+dsh plugin --profile web remove dsh-chat-focus   # removes the dependency + bundle layer; the host ui-chat row returns after a restart
 ```
 
-Two optional MANUAL cleanups afterwards (both inert leftovers; your call):
+Two optional manual cleanups afterwards (both are inert leftovers that do not affect running the app):
 
 ```powershell
-# 1) node_modules directory link left ONLY by `link:` installs (the loader never reads it):
+# 1) node_modules directory link left behind by a link: install (the loader never reads it):
 Remove-Item C:\Users\super\.dsh\profiles\web\node_modules\dsh-chat-focus -Force -Recurse
 
-# 2) the focus* customization fields under settings.yaml's ui-chat: namespace (the host
-#    schema ignores unknown keys; KEEP them to restore your bubble customization after a reinstall)
+# 2) the focus* custom fields in the ui-chat: namespace of settings.yaml
+#    (the fork's schema provides them; keep them and your bubble customisations come back on reinstall)
 ```
 
-Custom skin assets (`~/.dsh/chat-focus/`) are independent of the plugin and survive uninstall; delete the directory when you no longer need them.
+Your own skin assets (`~/.dsh/chat-focus/`) are independent of the plugin and survive uninstalling; delete the directory when you no longer want them. For the browser-side localStorage keys `dsh.chat-focus.fold.*` (unreachable from server-side tooling), run
+`Object.keys(localStorage).filter(k=>k.startsWith('dsh.chat-focus.')).forEach(k=>localStorage.removeItem(k))`
+in the dsh page console, or clear site data. Session logs stay untouched — the plugin is UI-only and writes nothing to them.
 
-Browser-side localStorage `dsh.chat-focus.fold.*` keys (unreachable by any server-side tool): in the dsh tab's console run
-`Object.keys(localStorage).filter(k=>k.startsWith('dsh.chat-focus.')).forEach(k=>localStorage.removeItem(k))`, or clear site data for the dsh origin. Session records are untouched — the plugin only renders UI.
+## Living with dsh-web-ui-all (skins)
 
-## Coexistence with dsh-web-ui-all (skins)
+Known conflict: **after switching skins the host fails to boot** with `failed to parse overlay .../cordis.patch.yml: YAMLException: end of the stream or a document separator is expected`.
 
-Known conflict: **after switching a skin, the host fails to boot** with `failed to parse overlay .../cordis.patch.yml: YAMLException: end of the stream or a document separator is expected`.
+Cause: the profile's boot patch template ships an `[]` placeholder, and the skin manager (`dsh-client-ui-skin-center`) **appends** its skin rows after that placeholder — a YAML flow sequence cannot be followed by top-level rows, so parsing fails. The skin manager itself is fine with a patch file that has no placeholder (this is unrelated to dsh-chat-focus; any profile hits it).
 
-Cause: the profile boot patch template ships with a bare `[]` placeholder; the skin manager (`dsh-client-ui-skin-center`) appends its rows after it — a YAML flow sequence cannot be followed by top-level rows, so parsing fails. The skin manager works fine on any placeholder-free patch file (unrelated to dsh-chat-focus; any profile hits it).
-
-Fix (one-time, idempotent; **does not modify third-party code**, unaffected by web-ui-all upgrades):
+Fix (one-off, idempotent, **no third-party package is modified**, so upgrading web-ui-all is unaffected):
 
 ```sh
-node scripts/patch-skin-center.mjs          # default web profile
+node scripts/patch-skin-center.mjs          # web profile by default
 node scripts/patch-skin-center.mjs --profile web
 ```
 
-The script removes the `[]` placeholder from the profile patch file (automatic `.bak` backup). **Restart dsh web afterwards** — skin switching then writes valid YAML and the skin feature works normally.
+The script removes the `[]` placeholder from the profile patch file (backing it up as `.bak`). **Restart dsh web afterwards** — skin switches then write valid YAML and skins keep working.
 
-## Configuration
+## Settings reference
 
-Settings fields (namespace `ui-conversation`, extended schema; already allowed by the host api-proxy allowlist):
+Open **Settings → 对话显示 (Conversation display)**.
 
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| focusEnabled | boolean | true | Master switch; off restores the original message order |
-| focusBubbles | boolean | true | Chat bubble chrome |
-| focusKeepVisible | number(0-10) | 1 | Replies kept expanded N |
+| Tab | Contents |
+| --- | --- |
+| Basics | Plugin switch (off = original chronological view), chat-bubble switch, bubble density (default / compact) |
+| Folding | Folding strategy (keep last N / threshold / always), number of recent replies kept open, default-open fold boxes, summary row, fold thinking in |
+| Bubble look | Assistant / User segments: style source (skin or palette), backdrop, text, geometry, copy to the other side, reset |
+| Skins | Make a new skin (five-step wizard), skin library (apply / rename / delete) |
+| Advanced | Skin-library status and asset directory, reset all settings |
+
+Settings fields (namespace `ui-chat`, an extended schema that the host's api-proxy allowlist already passes through):
+
+| Field | Type | Default | Meaning |
+|------|------|------|------|
+| focusEnabled | boolean | true | Master switch; off renders the original chronological view |
+| focusBubbles | boolean | true | Chat bubbles |
+| focusKeepVisible | number(0-10) | 1 | Number of recent replies kept expanded |
 | focusDefaultOpen | boolean | false | Fold boxes start expanded |
-| focusSummary | boolean | true | Fold summary (counts + tool names) |
-| focusStrategy | keep-recent/threshold/always | keep-recent | Fold strategy (expand recent N / threshold fold / fold all) |
-| focusBubbleStyle | default/compact | default | Bubble density |
-| focusReasoning | boolean | true | Text-less thinking steps join the runtime run |
-| focusBubbleBg / Border / Radius / MaxWidth / BgImage / BgSize | string | '' / cover | Assistant bubble custom chrome (bg / border / radius / max width / bg image / fit) |
-| focusBubbleTextColor / Font / FontSize / Padding | string | '' | Assistant bubble text custom (color / font / size / padding) |
-| focusBubbleGradientFrom / GradientTo / GradientAngle | string | '' / '' / '135' | Assistant bubble gradient (start/end colors, angle) |
-| focusBubblePreset | string | '' | Bubble template id |
-| focusUserBubble* (Bg / Border / Radius / MaxWidth / BgImage / BgSize / TextColor / Font / FontSize / Padding / Gradient* / Preset) | string | '' / cover | User bubble custom (14 symmetric knobs) |
+| focusSummary | boolean | true | Fold-box summary (counts + tool names) |
+| focusStrategy | keep-recent / threshold / always | keep-recent | Folding strategy |
+| focusBubbleStyle | default / compact | default | Bubble density |
+| focusReasoning | boolean | true | Fold thinking-only steps into the runtime group |
+| focusBubbleBg / Border / Radius / MaxWidth / BgImage / BgSize / BgPosition | string | '' / cover / center | Assistant bubble backdrop and geometry |
+| focusBubbleTextColor / Font / FontSize / Padding | string | '' | Assistant bubble text |
+| focusBubbleGradientFrom / GradientTo / GradientAngle | string | '' / '' / '135' | Assistant bubble gradient |
+| focusBubbleBackdropOpacity | number(0-100) | 100 | Whole-layer backdrop opacity |
+| focusBubbleBackdropBlur | '' / 4px / 10px / 18px | '' | Frosted glass preset |
+| focusBubbleOverlay | number(-100-100) | '0' | Text-readability overlay |
+| focusBubbleSkin / focusBubblePreset | string | '' | Applied skin id / palette id |
+| focusUserBubble\* (same shape as the assistant side) | string / number | as above | User bubble customisation |
+
+The skin library never goes through the settings file: assets and metadata live in `~/.dsh/chat-focus/skins/`, and only the skin id is stored in settings.
 
 ## Build
 
 ```sh
-pnpm install         # host repo (0.1.2-alpha.5 baseline) as cross-repo workspace members for @deepseek-ai/* deps
-pnpm run typecheck   # tsc --noEmit (type contracts from host lib/types artifacts)
-pnpm run bundle      # tsdown: lib/index.js (node half) + lib/client.js (browser bundle)
-pnpm test            # grouping engine + skin geometry/sniffing/validation + host asset store (tsx, no vitest)
+pnpm install        # the host repo (0.1.2-alpha.5 baseline) is a cross-repo workspace member providing @deepseek-ai/*
+pnpm run typecheck  # tsc --noEmit (type contracts come from the host's built lib/types)
+pnpm run bundle     # tsdown: lib/index.js (node half) + lib/client.js (browser bundle)
+pnpm test           # grouping engine + skin geometry/sniffing/validation + host asset store (tsx, no vitest)
 ```
 
-> Dev note: `pnpm-workspace.yaml` lists `../deepseek-harness/packages/*/*` and `../deepseek-harness/vendor/*` as workspace members (exact 0.1.2-alpha.5 contract). If pnpm does not materialize node_modules across parent directories, run `node scripts/setup-junctions.mjs` to link build deps by hand. **Never** run pnpm commands here that could rewrite the host node_modules.
+> Development notes: `pnpm-workspace.yaml` lists `../deepseek-harness/packages/*/*` and `../deepseek-harness/vendor/*` as workspace members (the exact 0.1.2-alpha.5 contract). If pnpm does not materialise node_modules for the cross-directory workspace, link the build dependencies by hand with `node scripts/setup-junctions.mjs`. **Do not** run pnpm commands in this repository that would rewrite the host's node_modules.
+>
+> After touching the node half (`src/index.ts` / `src/skins/host.ts` / `src/chat-settings.ts`) you must restart dsh: the browser half is read from disk per request (a page refresh picks it up), while the node half is loaded once at boot.
 
 ## Version pairing (upstream adaptation)
 
 | Host version | Fork version | Notes |
-|--------------|--------------|-------|
-| 0.1.2-alpha.5 | 0.4.0 | Translucent bubbles + bubble skin maker + left-rail settings page (host contract unchanged; purely additive) |
-| rc.5 (2026-08-16 baseline) | 0.2.0 | v0.2 baseline (full fold strategies, bg upload/crop/fit, fold-box virtualization) |
-| 0.1.2-alpha.5 (2026-09-02) | 0.3.0 | Route-B migration: the host removed `dsh-client-runtime`; the fork is now a chat layer (riding the `ui-conversation` engine row, replacing the `ui-chat` bubble row). Engine symbols moved to the `dsh-client-store` seed word, event predicates to `dsh-session/surface`, and the fold box dropped its estimated-row-height virtualizer |
-| 0.1.1-rc.2 | 0.2.5 | Adapt to the attachment plugin split (`ImageGallery` etc. no longer exported from the platform module table): user bubbles moved onto the SAME `ChatBubble` pipeline as assistant replies; message images / composer attachments now flow through the `conversation.message.images` / `conversation.input.attachments` slots; ported the `referenceLabels` projection and the new reference-chip styling |
+|---------|----------|------|
+| 0.1.2-alpha.5 | 0.4.0 | Translucent bubbles + bubble skin maker + left-rail settings (host contract unchanged, purely additive) |
+| 0.1.2-alpha.5 (2026-09-02) | 0.3.0 | Route-B migration: the host dropped `dsh-client-runtime`, so the fork became a chat-layer plugin riding the `ui-conversation` engine row and replacing the `ui-chat` bubble row |
+| 0.1.1-rc.2 | 0.2.5 | Adapted to the attachment plugin split: user bubbles went through the same `ChatBubble` pipeline as the assistant; reference chips and image slots ported |
+| rc.5 (2026-08-16 baseline) | 0.2.0 | The v0.2 baseline (all folding strategies, background-image upload/crop/fit, fold-box virtualisation) |
 
-When the host upgrades:
-1. Walk `docs/design/ui-design-20260816-dsh-chat-focus-模块1-基底复制域.md` §2.3 slot-contract table (21 slots + `conversation` service + node data model);
-2. Update `tsconfig.json` paths (lib/types entries may move);
-3. `pnpm run typecheck && pnpm run bundle`, then run a host test:gui smoke;
+When the host moves, adapt in this order:
+
+1. Walk the slot-contract table in `docs/design/ui-design-20260816-dsh-chat-focus-模块1-基底复制域.md` §2.3 (21 slots + the `conversation` service + the node data model);
+2. Update the paths in `tsconfig.json` (lib/types entry points may have moved);
+3. `pnpm run typecheck && pnpm run bundle`, then smoke-test in a real host (the test:gui equivalent);
 4. Update this table.
 
-The host is pre-release (contracts may drift). If adaptation cost exceeds maintenance capacity, the alternative design (view-add-on, zero-surgery plugin row) is documented in `docs/design/solution-design-20260816-dsh-chat-focus-备选方案-视图附加型.md`.
+The host is pre-release (the contract can drift at any time). If adaptation ever costs more than it is worth, the fallback is the view-attachment variant — a pure plugin row with no surgery — described in `docs/design/solution-design-20260816-dsh-chat-focus-备选方案-视图附加型.md`.
 
 ## Known limitations (v0.4)
 
-- The settings preview uses built-in sample data (the section seat is root-scoped; real-session preview is deferred per feedback)
-- Font presets rely on system fonts: KaiTi/SimSun/SimHei ship with Windows and macOS but may be missing on Linux (falls back to the system default)
-- Nine-slice applies to static images only: GIF/APNG, sprite sheets, and video render as one layer (radius + cover/stretch), because browsers do not animate `border-image`
-- The sprite route bakes frames at creation time; the runtime never decodes video. Sprite animation stretches with the bubble, so pick artwork close to a typical bubble aspect
-- The “use the video directly” route spends one video decoder per visible bubble (it pauses off-screen); many video bubbles in a long conversation will visibly cost GPU/memory, so reserve it for a few bubbles
-- Skins are shared across browsers on the same machine but do not travel with the settings file; copy `~/.dsh/chat-focus/` to move them
+- **Known defect**: the skin library occasionally lists fewer entries than it has — the host's `skins.list` returns every record, yet one is missing from the Skins grid and from the "Bubble look" skin dropdown, which then reads "skin not found (fell back to custom)". Refreshing the page restores it; the miss looks timing-related and is still to be fixed.
+- The settings preview uses built-in sample data (settings.section is a root scope with no session data channel; a real-session preview is on hold pending feedback).
+- Font presets depend on system fonts: KaiTi / SimSun / SimHei ship with Windows and macOS and may be missing on Linux (where they fall back to the system default).
+- Nine-slice applies to static images only: GIF/APNG, sprite sheets and video paint as one layer (rounded crop + cover/stretch), because browsers will not animate `border-image`.
+- The sprite route bakes frames at authoring time and never decodes video at runtime; the sprite stretches with the bubble, so art whose aspect ratio is close to a typical bubble looks best.
+- The "play the video directly" route costs one video decoder per visible bubble (paused off-screen); many video bubbles in a long session will tax GPU and memory, so use it sparingly.
+- Below 860px of available width the settings page falls back to its narrow layout (horizontal rail, collapsible preview). The host settings panel is 800px wide on this machine, so the narrow form is what you normally see.
+- Skin assets are shared across browsers on one machine but do not sync with the settings file; to move machines, copy `~/.dsh/chat-focus/` by hand.
 
 ## License
 
-MIT. Forked from `@deepseek-ai/dsh-client-ui-conversation` (MIT), upstream copyright retained.
+MIT. Forked from `@deepseek-ai/dsh-client-ui-conversation` (MIT); upstream notices are retained.
