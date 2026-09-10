@@ -5,7 +5,7 @@
 // estimate. State persists per anchor key in localStorage and degrades to
 // session-only storage on failure.
 
-import { memo, useState } from 'react'
+import { memo, useLayoutEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { IconChevronDownOutline14, IconChevronUpOutline14, IconThinkOutline14 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { RunItem, RuntimeSummary } from '../grouping/engine.ts'
@@ -66,6 +66,14 @@ export interface RuntimeFoldBoxProps {
   readonly renderItem: (item: RunItem, index: number) => ReactNode
 }
 
+/** Pixels from the floor that still count as "following the tail". */
+const FOLLOW_EPSILON = 4
+
+/** The conversation scroller this box scrolls inside (host-owned when present). */
+function scrollerOf(element: HTMLElement | null): HTMLElement | null {
+  return element?.closest<HTMLElement>('[data-conversation-scroll]') ?? null
+}
+
 /** Fold box with summary line and per-run persistence. */
 export const RuntimeFoldBox = memo(function RuntimeFoldBox({
   anchorKey, insideItems, summary, defaultOpen, strategySalt, summaryVisible, t, renderItem,
@@ -76,18 +84,52 @@ export const RuntimeFoldBox = memo(function RuntimeFoldBox({
   // live for groups the user never touched.
   const [manual, setManual] = useState<FoldBoxState | null>(() => readStored(storageKey))
   const open = manual === null ? defaultOpen : manual === 'expanded'
+  const boxRef = useRef<HTMLDetailsElement | null>(null)
+  /** Scroll geometry captured before a toggle, restored after the DOM commits. */
+  const anchorRef = useRef<{ summaryTop: number; atBottom: boolean } | null>(null)
 
   const toggle = (): void => {
+    const box = boxRef.current
+    const scroller = scrollerOf(box)
+    const summaryRow = box?.querySelector('summary') ?? null
+    anchorRef.current = scroller === null || summaryRow === null ? null : {
+      summaryTop: summaryRow.getBoundingClientRect().top,
+      atBottom: scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight <= FOLLOW_EPSILON,
+    }
     const next = !open
     setManual(next ? 'expanded' : 'collapsed')
     writeStored(storageKey, next ? 'expanded' : 'collapsed')
   }
 
+  // Expanding or collapsing changes the flow height. The rows inside mount in
+  // waves, so `scrollHeight` can briefly exceed the real content: a reader who
+  // was following the tail would land in blank space. Keep the summary row
+  // where it was, and re-pin to the true floor (this frame and the next) when
+  // the reader was already there.
+  useLayoutEffect(() => {
+    const anchor = anchorRef.current
+    anchorRef.current = null
+    if (anchor === null) return
+    const box = boxRef.current
+    const scroller = scrollerOf(box)
+    if (box === null || scroller === null) return
+    if (anchor.atBottom) {
+      const pin = (): void => { scroller.scrollTop = scroller.scrollHeight }
+      pin()
+      // A second correction catches rows that mount after this commit.
+      if (typeof requestAnimationFrame === 'function') requestAnimationFrame(pin)
+      return
+    }
+    const summaryRow = box.querySelector('summary')
+    if (summaryRow === null) return
+    scroller.scrollTop += summaryRow.getBoundingClientRect().top - anchor.summaryTop
+  }, [open])
+
   const namesText = summary.toolNames.slice(0, SUMMARY_TOOL_NAME_LIMIT).join('、')
   const overflow = Math.max(0, summary.toolNames.length - SUMMARY_TOOL_NAME_LIMIT)
 
   return (
-    <details className={css.box} open={open}>
+    <details ref={boxRef} className={css.box} open={open}>
       <summary className={css.summary} onClick={(event) => {
         event.preventDefault()
         toggle()

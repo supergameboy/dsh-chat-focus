@@ -13,6 +13,7 @@ import type { SnapshotStore } from '@deepseek-ai/dsh-client-store'
 import type { MarkdownFileMentions } from '@deepseek-ai/dsh-client-ui-primitives'
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type { createChatStore } from '../stores.ts'
+import type { SkinRegistry } from '../skins/registry.ts'
 import type { ToolCallId, SelectionTarget } from './store.ts'
 import type { ChatConversationViewNode, ChatNode, ChatNodeKind } from './chat-nodes.ts'
 import type {
@@ -90,6 +91,8 @@ export interface ChatNodeOwnerProps {
   turnProcess?: TurnProcessOwnerProps | undefined
   /** ChatFocus display section store (fold + bubble chrome). */
   chatFocus: SnapshotStore<ChatSettings>
+  /** Bubble-skin library (built-ins plus the Host asset store). */
+  skins: SkinRegistry
 }
 
 /** Shared presentation state for one Turn-process answer generation. */
@@ -135,6 +138,8 @@ export interface ChatViewInjected {
    *  node renderers subscribe directly; policy writes flow through the settings
    *  rows). */
   chatFocus: SnapshotStore<ChatSettings>
+  /** Bubble-skin library consumed by the bubble chrome. */
+  skins: SkinRegistry
   keyedHooks: {
     /** Resolve the stable source for one Chat Node key. */
     chatNode: (key: string) => ChatNodeSource

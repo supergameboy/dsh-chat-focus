@@ -1,0 +1,109 @@
+/* BubbleBackdrop: the themed layer behind one bubble's content. It owns every
+   background concern so the content layer can stay a plain text surface:
+   color, image, gradient, readability overlay, whole-layer opacity, frosted
+   glass, and the three skin families. The layer is absolutely positioned over
+   the content box's padding area, inherits the bubble radius, and never
+   receives pointer events. */
+
+.backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: inherit;
+  /* Frosted glass only shows through a TRANSLUCENT surface: the blur samples
+     what is behind this element, and an opaque background would paint over it.
+     `--cf-bubble-glass-alpha` (published when a glass preset is active) fades
+     the surface colour so the blurred backdrop reads. */
+  background-color: color-mix(
+    in srgb,
+    var(--cf-bubble-bg, var(--dsw-specific-bubble)) calc(var(--cf-bubble-glass-alpha, 1) * 100%),
+    transparent
+  );
+  background-size: var(--cf-bubble-bg-size, cover);
+  background-position: var(--cf-bubble-bg-position, 50% 50%);
+  overflow: hidden;
+  /* Readability overlay: an inset shadow paints above the background and
+     below the content, dimming or lifting whatever sits behind the text. The
+     user's border colour draws on its own layer (see .borderRing) so artwork
+     cannot paint over it. */
+  box-shadow: inset 0 0 0 9999px var(--cf-bubble-overlay, transparent);
+  opacity: var(--cf-bubble-backdrop-opacity, 1);
+  backdrop-filter: var(--cf-bubble-backdrop-filter, none);
+  pointer-events: none;
+}
+
+/* The user's border colour: a 1px ring on its own layer, above the artwork. */
+.borderRing {
+  position: absolute;
+  inset: 0;
+  border: 1px solid var(--cf-bubble-border, transparent);
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+/* Background image on its own layer so a glass preset can fade it (and only
+   it) — the colour keeps its own alpha from the mix above. */
+.imageLayer {
+  position: absolute;
+  inset: 0;
+  background-image: var(--cf-bubble-bg-image, none);
+  background-size: var(--cf-bubble-bg-size, cover);
+  background-position: var(--cf-bubble-bg-position, 50% 50%);
+  background-repeat: no-repeat;
+  opacity: var(--cf-bubble-glass-alpha, 1);
+}
+
+/* A skin owns the artwork: the user's colour and background image are
+   suppressed (the asset defines them). The readability overlay stays, because
+   it paints ON TOP of the artwork — that is exactly what it is for. */
+.skinLayer {
+  background-color: transparent;
+  background-image: none;
+  /* A glass preset fades the artwork as well; an opaque surface would hide
+     the blur behind it. */
+  opacity: var(--cf-bubble-glass-alpha, 1);
+}
+
+/* Nine-slice skins paint through border-image; the border area is reserved by
+   the inline border-width and the artwork supplies its own silhouette. */
+.skinNine {
+  background-color: transparent;
+  background-image: none;
+  border-style: solid;
+  border-color: transparent;
+  opacity: var(--cf-bubble-glass-alpha, 1);
+}
+
+/* Whole-layer skins (animated images, sprite sheets) are clipped to the skin
+   radius so a rectangular asset reads as a bubble. */
+.clipped {
+  overflow: hidden;
+}
+
+/* One horizontal sprite strip: `frames` frames wide, one frame visible. The
+   stepped translation is supplied inline (it depends on the frame count). */
+.sprite {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
+  will-change: transform;
+}
+
+/* One video layer: fills the clipped backdrop box, no controls, never
+   interactive (the bubble's text stays selectable above it). */
+.video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sprite {
+    animation: none !important;
+  }
+}

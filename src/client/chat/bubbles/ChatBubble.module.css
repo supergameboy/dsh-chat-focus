@@ -1,9 +1,11 @@
 /* ChatBubble: the ONE bubble chrome shared by both roles. The default
    mirrors the deepseek theme blue (--dsw-specific-bubble), 22px radius,
    no border — both sides stay consistent. User-defined overrides arrive
-   as CSS variables (--cf-bubble-*) set inline by the component. The
-   compact variant lowers density. The user variant right-aligns and
-   drops the logo (clock-only header). */
+   as CSS variables (--cf-bubble-*) set inline by the component; the themed
+   backdrop layer (BubbleBackdrop) paints every background concern, and the
+   body layer above it carries the text so opacity/glass never dims copy. The
+   compact variant lowers density. The user variant right-aligns and drops the
+   logo (clock-only header). */
 
 .bubble {
   display: flex;
@@ -47,24 +49,23 @@
 }
 
 .content {
+  position: relative;
   min-width: 0;
   border-radius: var(--cf-bubble-radius, 22px);
   padding: var(--cf-bubble-padding, 10px 14px);
   overflow-wrap: anywhere;
-  background-color: var(--cf-bubble-bg, var(--dsw-specific-bubble));
-  border: 1px solid var(--cf-bubble-border, transparent);
-  background-image: var(--cf-bubble-bg-image, none);
-  background-size: var(--cf-bubble-bg-size, cover);
-  background-position: var(--cf-bubble-bg-position, 50% 50%);
-  /* Text-readability overlay: an inset shadow draws above the background and
-     below the content, darkening/lightening the image behind the text. */
-  box-shadow: inset 0 0 0 9999px var(--cf-bubble-overlay, transparent);
   color: var(--cf-bubble-text-color, inherit);
   font-family: var(--cf-bubble-font, inherit);
   font-size: var(--cf-bubble-font-size, inherit);
 }
 
+.body {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+}
+
 .compact .content {
   border-radius: var(--cf-bubble-radius, 14px);
-  padding: 6px 10px;
+  padding: var(--cf-bubble-padding, 6px 10px);
 }

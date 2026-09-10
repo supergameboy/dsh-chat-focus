@@ -1,112 +1,42 @@
-// ChatFocusSection: the '对话显示' settings page — three grouped panels over
-// the shared conversation settings scope, with a live sample preview of the
-// fold box and bubble chrome (frozen sample data; the section seat is
-// root-scoped, so real session data needs a v0.2 inject channel).
+// ChatFocusSection: the '对话显示' settings page. A left tab rail (basics,
+// folding, bubble look, skins, advanced) drives one form pane, with the live
+// sample pinned beside it on wide layouts and collapsible above it on narrow
+// ones. The assistant/user bubble editors share one panel behind a segmented
+// switch, so the per-side rows exist once.
 
-import { memo, useLayoutEffect, useRef, useState } from 'react'
+import { memo, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import type { SnapshotStore } from '@deepseek-ai/dsh-client-store'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
-import { Modal } from '@deepseek-ai/dsh-client-ui-primitives'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type { ChatSettings } from '../../chat-settings.ts'
-import {
-  FOCUS_BG_POSITIONS, FOCUS_BUBBLE_BG_SIZES, FOCUS_BUBBLE_STYLES, FOCUS_STRATEGIES,
-  type FocusBubbleBgSize, type FocusBubbleStyle, type FocusFoldStrategy,
-} from '../../chat-settings.ts'
+import { EMPTY_SKIN_STYLE, type SkinStyle } from '../../skin-contract.ts'
+import type { SkinRecord } from '../../skin-contract.ts'
+import type { SkinRegistry } from '../skins/registry.ts'
 import type { ChatBubbleCustomStyle } from '../chat/bubbles/ChatBubble.tsx'
-import { RuntimeFoldBox, type RuntimeFoldBoxProps } from '../chat/bubbles/RuntimeFoldBox.tsx'
 import { ChatBubble } from '../chat/bubbles/ChatBubble.tsx'
-import { ImageCropper, compressImageDataUrl } from './ImageCropper.tsx'
+import { RuntimeFoldBox, type RuntimeFoldBoxProps } from '../chat/bubbles/RuntimeFoldBox.tsx'
+import { bubbleCustom, skinStylePatch } from '../chat/bubbles/chrome.ts'
 import type { FocusKey } from './focus-locale.ts'
+import { AdvancedPanel } from './AdvancedPanel.tsx'
+import { AppearancePanel, type BubbleSide } from './AppearancePanel.tsx'
+import { BasicPanel } from './BasicPanel.tsx'
+import { FoldPanel } from './FoldPanel.tsx'
+import { SkinsPanel } from './SkinsPanel.tsx'
+import { SkinMaker } from './SkinMaker.tsx'
+import { toSkinRender } from '../chat/bubbles/skin-render.ts'
 import css from './ChatFocusSection.module.css'
 
-/** Max uploaded background-image file size (keeps the settings file sane). */
-const MAX_UPLOAD_BYTES = 2 * 1024 * 1024
+/** Settings tabs, in navigation order. */
+const TABS = ['basic', 'fold', 'appearance', 'skins', 'advanced'] as const
+type FocusTab = typeof TABS[number]
 
-/** One built-in bubble template: fills the custom fields with one pick. */
-interface BubblePreset {
-  readonly id: string
-  readonly values: ChatBubbleCustomStyle
-}
+/** Layout width below which the rail turns horizontal and the preview folds. */
+const NARROW_WIDTH = 860
 
-/** Inline dotted texture for the texture template (no external assets). */
-const TEXTURE_DATA_URI = 'data:image/svg+xml,'
-  + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28">'
-    + '<rect width="28" height="28" fill="#f6f8fb"/>'
-    + '<circle cx="7" cy="7" r="2.5" fill="#dde5f0"/>'
-    + '<circle cx="21" cy="21" r="3" fill="#dde5f0"/></svg>')
+/** Long preview copy so stretching is visible in every skin. */
+const PREVIEW_LONG = '这是一段较长的回复示例文本，用来验证气泡在内容变长时的拉伸效果是否自然，两端是否变形。'
 
-/** Built-in bubble templates ('' = theme default). */
-const BUBBLE_PRESETS: readonly BubblePreset[] = [
-  { id: '', values: {} },
-  { id: 'sky', values: { bg: '#e8f1ff', border: '#c9dcff', radius: '14px' } },
-  { id: 'mint', values: { bg: '#e6f7ec', border: '#bfe6cd', radius: '14px' } },
-  {
-    id: 'gradient',
-    values: {
-      bg: 'transparent',
-      bgImage: 'linear-gradient(135deg, #eef2ff 0%, #fdf2f8 100%)',
-      border: '#e0e7ff',
-      radius: '16px',
-    },
-  },
-  { id: 'dark', values: { bg: '#1f2937', border: '#374151', radius: '12px' } },
-  { id: 'texture', values: { bg: 'transparent', bgImage: TEXTURE_DATA_URI, border: '#e5e7eb', radius: '12px' } },
-]
-
-/** Preview custom style for one side (gradient overrides the background image).
- *  A live slider draft overrides the stored overlay so the preview follows
- *  the thumb while dragging, before the commit writes the setting. */
-function previewCustom(
-  focus: ChatSettings,
-  side: 'assistant' | 'user',
-  overlayDraft: number | null,
-): ChatBubbleCustomStyle {
-  const prefix = side === 'assistant' ? 'focusBubble' : 'focusUserBubble'
-  const f = (suffix: string): string => focus[`${prefix}${suffix}` as keyof ChatSettings] as string
-  const gradient = f('GradientFrom') !== ''
-  return {
-    bg: gradient ? 'transparent' : f('Bg'),
-    border: f('Border'),
-    radius: f('Radius'),
-    maxWidth: f('MaxWidth'),
-    bgImage: gradient
-      ? `linear-gradient(${f('GradientAngle')}deg, ${f('GradientFrom')}, ${f('GradientTo') !== '' ? f('GradientTo') : f('GradientFrom')})`
-      : f('BgImage'),
-    bgSize: focus[`${prefix}BgSize` as keyof ChatSettings] as FocusBubbleBgSize,
-    bgPosition: focus[`${prefix}BgPosition` as keyof ChatSettings] as 'top' | 'center' | 'bottom',
-    overlay: overlayDraft === null ? f('Overlay') : String(overlayDraft),
-    textColor: f('TextColor'),
-    font: f('Font'),
-    fontSize: f('FontSize'),
-    padding: f('Padding'),
-  }
-}
-
-/** Hex color input plus free-form text input for one color field. */
-function ColorField({ value, onChange }: {
-  value: string
-  onChange: (next: string) => void
-}) {
-  return (
-    <div className={css.colorRow}>
-      <input
-        type="color"
-        className={css.colorPicker}
-        value={/^#[0-9a-fA-F]{6}$/.test(value) ? value : '#dbeafe'}
-        onChange={event => onChange(event.target.value)}
-      />
-      <input
-        type="text"
-        className={css.textInput}
-        value={value}
-        onChange={event => onChange(event.target.value)}
-      />
-    </div>
-  )
-}
-
-/** Injected share: the live settings snapshot (useFocusSettings) and one field write. */
+/** Injected share: the live settings snapshot (useFocusSettings) and field writes. */
 export interface ChatFocusSectionInjected {
   hooks: {
     /** Durable ChatFocus section bound as useFocusSettings. */
@@ -114,6 +44,10 @@ export interface ChatFocusSectionInjected {
   }
   /** Write one scalar field of the Chat settings namespace. */
   setFocusField: (field: keyof ChatSettings, value: unknown) => void
+  /** Write several fields as one atomic settings mutation. */
+  setFocusFields: (patch: Partial<ChatSettings>) => void
+  /** Bubble-skin library (state plus save/delete/rename). */
+  skins: SkinRegistry
 }
 
 /** Full props of the ChatFocus settings section. */
@@ -141,705 +75,292 @@ function PreviewNode({ label }: { label: string }) {
   )
 }
 
-/** One settings row: label/hint plus the control slot. */
-function Row({ title, hint, control }: {
-  title: string
-  hint: string
-  control: React.ReactNode
-}) {
-  return (
-    <div className={css.row}>
-      <div className={css.rowCopy}>
-        <span className={css.rowTitle}>{title}</span>
-        <span className={css.rowHint}>{hint}</span>
-      </div>
-      <div className={css.rowControl}>{control}</div>
-    </div>
-  )
-}
-
-function Checkbox({ checked, onChange, label }: {
-  checked: boolean
-  onChange: (next: boolean) => void
-  label: string
-}) {
-  return (
-    <label className={css.checkbox}>
-      <input type="checkbox" checked={checked} onChange={event => onChange(event.target.checked)} />
-      <span>{label}</span>
-    </label>
-  )
-}
-
-/** Available font presets (system stacks; '' follows the theme). The stacks
- *  pick fonts that exist on both Windows and macOS and differ visibly from
- *  the theme default, so picking one produces an immediate visual change. */
-const FONT_PRESETS: readonly { id: string; value: string }[] = [
-  { id: 'default', value: '' },
-  { id: 'kaiti', value: "'KaiTi', 'STKaiti', serif" },
-  { id: 'simsun', value: "'SimSun', 'Songti SC', serif" },
-  { id: 'simhei', value: "'SimHei', 'Heiti SC', sans-serif" },
-  { id: 'yahei', value: "'Microsoft YaHei', 'PingFang SC', sans-serif" },
-  { id: 'serif', value: "Georgia, 'Times New Roman', serif" },
-  { id: 'mono', value: "Consolas, 'Courier New', monospace" },
-]
-
-/** Font size presets (16px is the theme default; larger steps make changes obvious). */
-const FONT_SIZE_PRESETS = ['', '12px', '14px', '16px', '18px', '20px', '24px']
-/** Padding presets. */
-const PADDING_PRESETS = ['', '6px 10px', '10px 14px', '14px 18px']
-
-/** Text-readability overlay slider range: -100 (solid black) … +100 (solid white). */
-const OVERLAY_MIN = -100
-const OVERLAY_MAX = 100
-
-/** Slider position from a stored overlay value (legacy CSS colors map to 0). */
-function overlayStrength(value: string): number {
-  const strength = Number(value)
-  return Number.isNaN(strength) ? 0 : Math.max(OVERLAY_MIN, Math.min(OVERLAY_MAX, strength))
-}
-
-/** Readable label for the current overlay strength. */
-function overlayLabel(value: string, t: (key: FocusKey, params?: Record<string, string>) => string): string {
-  const strength = overlayStrength(value)
-  if (strength === 0) return t('focus.overlay.none')
-  return strength < 0
-    ? t('focus.overlay.black', { value: String(-strength) })
-    : t('focus.overlay.white', { value: String(strength) })
-}
-
-/** Preset dropdown that falls back to a custom option for free-form values. */
-function PresetSelect({ presets, value, emptyKey, customKey, onChange, t }: {
-  presets: readonly string[]
-  value: string
-  emptyKey: string
-  customKey: string
-  onChange: (next: string) => void
-  t: (key: FocusKey) => string
-}) {
-  const matched = presets.includes(value)
-  return (
-    <select
-      className={css.select}
-      value={matched ? value : '__custom__'}
-      onChange={event => {
-        const next = event.target.value
-        if (next !== '__custom__') onChange(next)
-      }}
-    >
-      {presets.map(preset => (
-        <option key={preset || 'default'} value={preset}>
-          {preset === '' ? t(emptyKey as FocusKey) : preset}
-        </option>
-      ))}
-      {!matched && value !== '' && <option value="__custom__">{t(customKey as FocusKey)}</option>}
-    </select>
-  )
-}
-
-/** Font family dropdown over the system-stack presets. */
-function FontSelect({ value, onChange, t }: {
-  value: string
-  onChange: (next: string) => void
-  t: (key: FocusKey) => string
-}) {
-  const matched = FONT_PRESETS.find(preset => preset.value === value)
-  return (
-    <select
-      className={css.select}
-      value={matched !== undefined ? matched.id : '__custom__'}
-      onChange={event => {
-        const preset = FONT_PRESETS.find(candidate => candidate.id === event.target.value)
-        if (preset !== undefined) onChange(preset.value)
-      }}
-    >
-      {FONT_PRESETS.map(preset => (
-        <option key={preset.id} value={preset.id}>{t(`focus.font.${preset.id}` as FocusKey)}</option>
-      ))}
-      {matched === undefined && value !== '' && <option value="__custom__">{t('focus.font.custom')}</option>}
-    </select>
-  )
-}
-
-/** Gradient editor: enable + start/end colors (color wheels) + angle. */
-function GradientEditor({ from, to, angle, onChangeFrom, onChangeTo, onChangeAngle, t }: {
-  from: string
-  to: string
-  angle: string
-  onChangeFrom: (next: string) => void
-  onChangeTo: (next: string) => void
-  onChangeAngle: (next: string) => void
-  t: (key: FocusKey) => string
-}) {
-  const enabled = from !== ''
-  return (
-    <div className={css.gradientBox}>
-      <label className={css.checkbox}>
-        <input
-          type="checkbox"
-          checked={enabled}
-          onChange={event => onChangeFrom(event.target.checked ? '#eef2ff' : '')}
-        />
-        <span>{t('focus.gradientEnable')}</span>
-      </label>
-      {enabled && (
-        <div className={css.gradientRow}>
-          <ColorField value={from} onChange={onChangeFrom} />
-          <ColorField value={to !== '' ? to : from} onChange={onChangeTo} />
-          <input
-            type="number"
-            className={css.number}
-            min={0}
-            max={360}
-            step={15}
-            value={angle}
-            onChange={event => onChangeAngle(String(Number(event.target.value) || 0))}
-          />
-          <span className={css.gradientAngle}>°</span>
-        </div>
-      )}
-    </div>
-  )
-}
-
-/** Background image field: upload + crop dialog, thumbnail, URL input, clear. */
-function BgImageField({ value, onChange, t }: {
-  value: string
-  onChange: (next: string) => void
-  t: (key: FocusKey) => string
-}) {
-  const fileRef = useRef<HTMLInputElement>(null)
-  const [cropSource, setCropSource] = useState<string | null>(null)
-  const [uploadError, setUploadError] = useState<string | null>(null)
-
-  const onFilePicked = (event: React.ChangeEvent<HTMLInputElement>): void => {
-    const file = event.target.files?.[0]
-    event.target.value = ''
-    if (file === undefined) return
-    if (file.size > MAX_UPLOAD_BYTES) {
-      setUploadError(t('focus.uploadTooLarge'))
-      return
-    }
-    setUploadError(null)
-    const reader = new FileReader()
-    reader.onload = () => {
-      if (typeof reader.result !== 'string') return
-      // Downscale before cropping so the exported settings value stays small
-      // enough for the settings write to succeed reliably.
-      void compressImageDataUrl(reader.result).then(setCropSource, () => {
-        setUploadError(t('focus.uploadTooLarge'))
-      })
-    }
-    reader.readAsDataURL(file)
-  }
-
-  return (
-    <>
-      <div className={css.bgImageControl}>
-        <input ref={fileRef} type="file" accept="image/*" hidden onChange={onFilePicked} />
-        <button type="button" className={css.uploadButton} onClick={() => fileRef.current?.click()}>
-          {t('focus.upload')}
-        </button>
-        {value !== '' && <img className={css.bgThumb} src={value} alt="" />}
-        <input
-          type="text"
-          className={css.textInput}
-          placeholder="https://… 或 data:image/…"
-          value={value}
-          onChange={event => onChange(event.target.value)}
-        />
-        {value !== '' && (
-          <button type="button" className={css.clearButton} onClick={() => onChange('')}>
-            {t('focus.clearImage')}
-          </button>
-        )}
-      </div>
-      {uploadError !== null && <span className={css.uploadError} role="status">{uploadError}</span>}
-      <Modal
-        open={cropSource !== null}
-        onClose={() => setCropSource(null)}
-        title={t('focus.cropTitle')}
-        closeLabel={t('focus.close')}
-      >
-        {cropSource !== null && (
-          <ImageCropper
-            imageUrl={cropSource}
-            onConfirm={dataUrl => {
-              onChange(dataUrl)
-              setCropSource(null)
-            }}
-            onCancel={() => setCropSource(null)}
-          />
-        )}
-      </Modal>
-    </>
-  )
-}
-
-/** Full per-side bubble editor (assistant or user) with the shared knobs. */
-function BubbleSideEditor({ side, focus, setField, overlayDraft, onOverlayDraft, t }: {
-  side: 'assistant' | 'user'
-  focus: ChatSettings
-  setField: (field: keyof ChatSettings, value: unknown) => void
-  /** Live slider value while dragging (preview only, not yet persisted). */
-  overlayDraft: number | null
-  /** Update the live slider draft (no settings write). */
-  onOverlayDraft: (next: number | null) => void
-  t: (key: FocusKey) => string
-}) {
+/** Preview custom style for one side (gradient overrides the background image).
+ *  Live slider drafts override the stored values so the preview follows the
+ *  thumb while dragging, before the commit writes the setting. */
+function previewCustom(
+  focus: ChatSettings,
+  side: BubbleSide,
+  overlayDraft: number | null,
+  opacityDraft: number | null,
+  skins: SkinRegistry,
+): ChatBubbleCustomStyle {
   const prefix = side === 'assistant' ? 'focusBubble' : 'focusUserBubble'
-  const field = (suffix: string): keyof ChatSettings => `${prefix}${suffix}` as keyof ChatSettings
-  const value = (suffix: string): string => focus[field(suffix)] as string
-  const set = (suffix: string, next: unknown): void => setField(field(suffix), next)
-  const commitOverlay = (): void => {
-    if (overlayDraft === null) return
-    set('Overlay', String(overlayDraft))
-    onOverlayDraft(null)
-  }
+  const f = (suffix: string): string => focus[`${prefix}${suffix}` as keyof ChatSettings] as string
+  const entry = skins.resolve(f('Skin'))
+  return bubbleCustom({
+    bg: f('Bg'),
+    border: f('Border'),
+    radius: f('Radius'),
+    maxWidth: f('MaxWidth'),
+    bgImage: f('BgImage'),
+    bgSize: focus[`${prefix}BgSize` as keyof ChatSettings] as ChatSettings['focusBubbleBgSize'],
+    bgPosition: focus[`${prefix}BgPosition` as keyof ChatSettings] as 'top' | 'center' | 'bottom',
+    overlay: overlayDraft === null ? f('Overlay') : String(overlayDraft),
+    backdropOpacity: opacityDraft ?? (focus[`${prefix}BackdropOpacity` as keyof ChatSettings] as number),
+    backdropBlur: f('BackdropBlur'),
+    gradientFrom: f('GradientFrom'),
+    gradientTo: f('GradientTo'),
+    gradientAngle: f('GradientAngle'),
+    textColor: f('TextColor'),
+    font: f('Font'),
+    fontSize: f('FontSize'),
+    padding: f('Padding'),
+  }, entry === undefined ? undefined : toSkinRender(entry, skins.urlOf(entry)))
+}
 
-  return (
-    <details className={css.sideBlock} open>
-      <summary className={css.sideTitle}>
-        {t(side === 'assistant' ? 'focus.sideAssistant' : 'focus.sideUser')}
-      </summary>
-      <Row
-        title={t('focus.preset')}
-        hint={t('focus.presetHint')}
-        control={(
-          <select
-            className={css.select}
-            value={value('Preset')}
-            onChange={event => {
-              const id = event.target.value
-              const preset = BUBBLE_PRESETS.find(candidate => candidate.id === id)
-              if (preset === undefined) return
-              set('Preset', id)
-              set('Bg', preset.values.bg ?? '')
-              set('Border', preset.values.border ?? '')
-              set('Radius', preset.values.radius ?? '')
-              set('MaxWidth', preset.values.maxWidth ?? '')
-              set('BgImage', preset.values.bgImage ?? '')
-              // Presets that carry a background image disable the gradient.
-              if (preset.values.bgImage !== undefined && preset.values.bgImage !== '') set('GradientFrom', '')
-            }}
-          >
-            {BUBBLE_PRESETS.map(preset => (
-              <option key={preset.id || 'default'} value={preset.id}>
-                {t((preset.id === '' ? 'focus.preset.default' : `focus.preset.${preset.id}`) as FocusKey)}
-              </option>
-            ))}
-            <option value="__custom__">{t('focus.preset.custom')}</option>
-          </select>
-        )}
-      />
-      <Row
-        title={t('focus.gradient')}
-        hint={t('focus.gradientHint')}
-        control={(
-          <GradientEditor
-            from={value('GradientFrom')}
-            to={value('GradientTo')}
-            angle={value('GradientAngle')}
-            onChangeFrom={next => {
-              set('GradientFrom', next)
-              // Gradient and background image are mutually exclusive.
-              if (next !== '') set('BgImage', '')
-            }}
-            onChangeTo={next => set('GradientTo', next)}
-            onChangeAngle={next => set('GradientAngle', next)}
-            t={t}
-          />
-        )}
-      />
-      <Row
-        title={t('focus.customBg')}
-        hint={t('focus.customHint')}
-        control={<ColorField value={value('Bg')} onChange={next => set('Bg', next)} />}
-      />
-      <Row
-        title={t('focus.customBorder')}
-        hint={t('focus.customHint')}
-        control={<ColorField value={value('Border')} onChange={next => set('Border', next)} />}
-      />
-      <Row
-        title={t('focus.customRadius')}
-        hint={t('focus.customHint')}
-        control={(
-          <PresetSelect
-            presets={['', '10px', '14px', '18px', '22px']}
-            value={value('Radius')}
-            emptyKey="focus.radiusDefault"
-            customKey="focus.customValue"
-            onChange={next => set('Radius', next)}
-            t={t}
-          />
-        )}
-      />
-      <Row
-        title={t('focus.customMaxWidth')}
-        hint={t('focus.customHint')}
-        control={(
-          <PresetSelect
-            presets={['', '480px', '600px', '720px', '840px']}
-            value={value('MaxWidth')}
-            emptyKey="focus.widthDefault"
-            customKey="focus.customValue"
-            onChange={next => set('MaxWidth', next)}
-            t={t}
-          />
-        )}
-      />
-      <Row
-        title={t('focus.customBgImage')}
-        hint={t('focus.customBgImageHint')}
-        control={(
-          <BgImageField
-            value={value('BgImage')}
-            onChange={next => {
-              set('BgImage', next)
-              // A background image and a gradient are mutually exclusive:
-              // setting an image disables the gradient so it cannot silently
-              // override the picture.
-              if (next !== '') set('GradientFrom', '')
-            }}
-            t={t}
-          />
-        )}
-      />
-      <Row
-        title={t('focus.bgSize')}
-        hint={t('focus.bgSizeHint')}
-        control={(
-          <select
-            className={css.select}
-            value={value('BgSize')}
-            onChange={event => set('BgSize', event.target.value as FocusBubbleBgSize)}
-          >
-            {FOCUS_BUBBLE_BG_SIZES.map(size => (
-              <option key={size} value={size}>{t(`focus.bgSize.${size}`)}</option>
-            ))}
-          </select>
-        )}
-      />
-      <Row
-        title={t('focus.bgPosition')}
-        hint={t('focus.bgPositionHint')}
-        control={(
-          <select
-            className={css.select}
-            value={value('BgPosition')}
-            onChange={event => set('BgPosition', event.target.value)}
-          >
-            {FOCUS_BG_POSITIONS.map(position => (
-              <option key={position} value={position}>{t(`focus.bgPosition.${position}`)}</option>
-            ))}
-          </select>
-        )}
-      />
-      <Row
-        title={t('focus.overlay')}
-        hint={t('focus.overlayHint')}
-        control={(
-          <div className={css.overlayControl}>
-            <input
-              type="range"
-              className={css.overlaySlider}
-              min={-100}
-              max={100}
-              step={5}
-              value={overlayDraft ?? overlayStrength(value('Overlay'))}
-              // Drag only updates the local draft (preview follows instantly);
-              // the settings write happens once on release/keyup/blur.
-              onChange={event => onOverlayDraft(Number(event.target.value))}
-              onPointerUp={commitOverlay}
-              onKeyUp={commitOverlay}
-              onBlur={commitOverlay}
-            />
-            <span className={css.overlayValue}>
-              {overlayLabel(overlayDraft === null ? value('Overlay') : String(overlayDraft), t)}
-            </span>
-          </div>
-        )}
-      />
-      <Row
-        title={t('focus.customTextColor')}
-        hint={t('focus.customHint')}
-        control={<ColorField value={value('TextColor')} onChange={next => set('TextColor', next)} />}
-      />
-      <Row
-        title={t('focus.customFont')}
-        hint={t('focus.customHint')}
-        control={<FontSelect value={value('Font')} onChange={next => set('Font', next)} t={t} />}
-      />
-      <Row
-        title={t('focus.customFontSize')}
-        hint={t('focus.customHint')}
-        control={(
-          <PresetSelect
-            presets={FONT_SIZE_PRESETS}
-            value={value('FontSize')}
-            emptyKey="focus.fontSizeDefault"
-            customKey="focus.customValue"
-            onChange={next => set('FontSize', next)}
-            t={t}
-          />
-        )}
-      />
-      <Row
-        title={t('focus.customPadding')}
-        hint={t('focus.customHint')}
-        control={(
-          <PresetSelect
-            presets={PADDING_PRESETS}
-            value={value('Padding')}
-            emptyKey="focus.paddingDefault"
-            customKey="focus.customValue"
-            onChange={next => set('Padding', next)}
-            t={t}
-          />
-        )}
-      />
-      <button
-        type="button"
-        className={css.resetButton}
-        onClick={() => {
-          set('Preset', '')
-          set('Bg', '')
-          set('Border', '')
-          set('Radius', '')
-          set('MaxWidth', '')
-          set('BgImage', '')
-          set('BgSize', 'cover')
-          set('BgPosition', 'center')
-          set('Overlay', '')
-          set('GradientFrom', '')
-          set('GradientTo', '')
-          set('GradientAngle', '135')
-          set('TextColor', '')
-          set('Font', '')
-          set('FontSize', '')
-          set('Padding', '')
-        }}
-      >
-        {t('focus.customReset')}
-      </button>
-    </details>
-  )
+/** Read one side's current style as the packaged draft the maker starts from. */
+function seedStyle(side: BubbleSide, focus: ChatSettings): SkinStyle {
+  const prefix = side === 'assistant' ? 'focusBubble' : 'focusUserBubble'
+  const text = (suffix: string): string => focus[`${prefix}${suffix}` as keyof ChatSettings] as string
+  return {
+    bg: text('Bg'),
+    gradientFrom: text('GradientFrom'),
+    gradientTo: text('GradientTo'),
+    gradientAngle: text('GradientAngle') === '' ? EMPTY_SKIN_STYLE.gradientAngle : text('GradientAngle'),
+    border: text('Border'),
+    overlay: text('Overlay') === '' ? EMPTY_SKIN_STYLE.overlay : text('Overlay'),
+    backdropOpacity: focus[`${prefix}BackdropOpacity` as keyof ChatSettings] as number,
+    backdropBlur: text('BackdropBlur'),
+    textColor: text('TextColor'),
+    font: text('Font'),
+    fontSize: text('FontSize'),
+  }
 }
 
 /** The ChatFocus display settings page. */
 export const ChatFocusSection = memo(function ChatFocusSection({
-  close, useFocusSettings, setFocusField, t,
+  close, useFocusSettings, setFocusField, setFocusFields, skins, t,
 }: ChatFocusSectionProps) {
   const focus = useFocusSettings(value => value)
   const setField = (field: keyof ChatSettings, value: unknown): void => {
     setFocusField(field, value)
   }
-  // Live overlay slider drafts per side: dragging updates these (and thus the
-  // preview) locally; releasing commits the value through the settings scope.
+  const [tab, setTab] = useState<FocusTab>('basic')
+  const [appearanceSide, setAppearanceSide] = useState<BubbleSide>('assistant')
+  const [makerOpen, setMakerOpen] = useState(false)
+  const [previewOpen, setPreviewOpen] = useState(true)
+  // Re-render when the skin library changes so the preview and skin pickers
+  // reflect a just-saved or just-deleted skin.
+  const skinsState = useSyncExternalStore(
+    skins.state.subscribe,
+    () => skins.state.getSnapshot(),
+    () => skins.state.getSnapshot(),
+  )
+  // Live slider drafts per side: dragging updates these (and thus the preview)
+  // locally; releasing commits the value through the settings scope.
   const [overlayDrafts, setOverlayDrafts] = useState<{ assistant: number | null; user: number | null }>({
     assistant: null,
     user: null,
   })
-  const overlayHandlers = (side: 'assistant' | 'user') => ({
+  const [opacityDrafts, setOpacityDrafts] = useState<{ assistant: number | null; user: number | null }>({
+    assistant: null,
+    user: null,
+  })
+  const overlayHandlers = (side: BubbleSide) => ({
     overlayDraft: overlayDrafts[side],
     onOverlayDraft: (next: number | null): void => {
       setOverlayDrafts(drafts => ({ ...drafts, [side]: next }))
     },
+    opacityDraft: opacityDrafts[side],
+    onOpacityDraft: (next: number | null): void => {
+      setOpacityDrafts(drafts => ({ ...drafts, [side]: next }))
+    },
   })
   const rootRef = useRef<HTMLDivElement | null>(null)
-  // The settings slot renders inside a host scroll pane whose height chain
-  // has no 100% contract, so measure the nearest scroll ancestor and pin the
-  // pane height to it: controls scroll above, the preview stays fixed below.
+  // The settings slot renders inside a host scroll pane whose height chain has
+  // no 100% contract, so measure the nearest scroll ancestor and pin the pane
+  // height to it: the rail and preview stay put while the form scrolls.
   const [paneHeight, setPaneHeight] = useState<number | null>(null)
+  // The rail collapses to a horizontal strip when the slot is narrow; measured
+  // from the pane itself because the host gives no container-query context.
+  const [narrow, setNarrow] = useState(false)
   useLayoutEffect(() => {
     const el = rootRef.current
     if (el === null) return
+    const measureWidth = (): void => setNarrow(el.clientWidth > 0 && el.clientWidth < NARROW_WIDTH)
+    measureWidth()
+    const widthObserver = new ResizeObserver(measureWidth)
+    widthObserver.observe(el)
     let scroller: HTMLElement | null = el.parentElement
     while (scroller !== null && scroller !== document.body) {
       const overflow = getComputedStyle(scroller).overflowY
       if (overflow === 'auto' || overflow === 'scroll') break
       scroller = scroller.parentElement
     }
-    if (scroller === null || scroller === document.body) return
-    const measure = (): void => setPaneHeight(scroller.clientHeight)
-    measure()
-    const observer = new ResizeObserver(measure)
-    observer.observe(scroller)
-    return () => { observer.disconnect() }
+    const measureHeight = (): void => setPaneHeight(scroller === null ? null : scroller.clientHeight)
+    measureHeight()
+    const heightObserver = scroller === null ? null : new ResizeObserver(measureHeight)
+    if (scroller !== null) heightObserver?.observe(scroller)
+    return () => {
+      widthObserver.disconnect()
+      heightObserver?.disconnect()
+    }
   }, [])
+
+  /** Apply a freshly saved skin to the sides the maker selected: the artwork
+   *  id plus its packaged style, written as ONE atomic settings mutation per
+   *  side (preset semantics — every field stays editable afterwards). */
+  const onSkinSaved = (record: SkinRecord, target: 'assistant' | 'user' | 'both' | 'none'): void => {
+    const patch: Partial<ChatSettings> = {}
+    if (target === 'assistant' || target === 'both') {
+      patch.focusBubbleSkin = record.id
+      Object.assign(patch as Record<string, unknown>, skinStylePatch(record.style, 'assistant'))
+    }
+    if (target === 'user' || target === 'both') {
+      patch.focusUserBubbleSkin = record.id
+      Object.assign(patch as Record<string, unknown>, skinStylePatch(record.style, 'user'))
+    }
+    setFocusFields(patch)
+    setTab('skins')
+  }
+
+  const assistantCustom = useMemo(
+    () => previewCustom(focus, 'assistant', overlayDrafts.assistant, opacityDrafts.assistant, skins),
+    [focus, overlayDrafts.assistant, opacityDrafts.assistant, skins, skinsState],
+  )
+  const userCustom = useMemo(
+    () => previewCustom(focus, 'user', overlayDrafts.user, opacityDrafts.user, skins),
+    [focus, overlayDrafts.user, opacityDrafts.user, skins, skinsState],
+  )
+
+  const showFold = tab === 'basic' || tab === 'fold' || tab === 'advanced'
+  const showUser = tab === 'appearance' || tab === 'skins' || tab === 'advanced'
+
+  /** Move the rail selection with the arrow keys (orientation-aware). */
+  const onRailKey = (event: React.KeyboardEvent<HTMLElement>): void => {
+    const at = TABS.indexOf(tab)
+    const previous = narrow ? 'ArrowLeft' : 'ArrowUp'
+    const next = narrow ? 'ArrowRight' : 'ArrowDown'
+    if (event.key === next) setTab(TABS[(at + 1) % TABS.length]!)
+    else if (event.key === previous) setTab(TABS[(at + TABS.length - 1) % TABS.length]!)
+    else if (event.key === 'Home') setTab(TABS[0])
+    else if (event.key === 'End') setTab(TABS[TABS.length - 1]!)
+  }
 
   return (
     <div
       ref={rootRef}
       className={css.root}
+      data-narrow={narrow || undefined}
       role="tabpanel"
       aria-label={t('focus.sectionLabel')}
       style={paneHeight === null ? undefined : { height: paneHeight }}
     >
       <div className={css.header}>
         <span className={css.headerTitle}>{t('focus.sectionLabel')}</span>
-        <button type="button" className={css.close} onClick={close}>{t('focus.close')}</button>
+        <div className={css.headerActions}>
+          {narrow && (
+            <button type="button" className={css.close} onClick={() => setPreviewOpen(open => !open)}>
+              {previewOpen ? t('focus.previewHide') : t('focus.previewShow')}
+            </button>
+          )}
+          <button type="button" className={css.close} onClick={close}>{t('focus.close')}</button>
+        </div>
       </div>
 
-      {/* Top pane scrolls the grouped controls; the live sample below stays
-          fixed at the bottom so every bubble-field edit stays visible. */}
-      <div className={css.settingsScroll}>
-      <details className={css.group} open>
-        <summary className={css.groupSummary}>{t('focus.basicGroup')}</summary>
-        <div className={css.groupBody}>
-          <Row
-            title={t('focus.enabled')}
-            hint={t('focus.enabledHint')}
-            control={(
-              <Checkbox
-                checked={focus.focusEnabled}
-                onChange={next => setField('focusEnabled', next)}
-                label={focus.focusEnabled ? '开' : '关'}
-              />
-            )}
-          />
-          <Row
-            title={t('focus.bubbles')}
-            hint={t('focus.bubblesHint')}
-            control={(
-              <Checkbox
-                checked={focus.focusBubbles}
-                onChange={next => setField('focusBubbles', next)}
-                label={focus.focusBubbles ? '开' : '关'}
-              />
-            )}
-          />
-        </div>
-      </details>
-
-      <details className={css.group} open>
-        <summary className={css.groupSummary}>{t('focus.foldGroup')}</summary>
-        <div className={css.groupBody}>
-          <Row
-            title={t('focus.keepVisible')}
-            hint={t('focus.keepVisibleHint')}
-            control={(
-              <input
-                type="number"
-                min={0}
-                max={10}
-                step={1}
-                value={String(focus.focusKeepVisible)}
-                onChange={event => setField('focusKeepVisible', Number(event.target.value))}
-                className={css.number}
-              />
-            )}
-          />
-          <Row
-            title={t('focus.defaultOpen')}
-            hint={t('focus.defaultOpenHint')}
-            control={(
-              <Checkbox
-                checked={focus.focusDefaultOpen}
-                onChange={next => setField('focusDefaultOpen', next)}
-                label={focus.focusDefaultOpen ? '开' : '关'}
-              />
-            )}
-          />
-          <Row
-            title={t('focus.strategy')}
-            hint={t('focus.strategy.keep-recent')}
-            control={(
-              <select
-                className={css.select}
-                value={focus.focusStrategy}
-                onChange={event => setField('focusStrategy', event.target.value as FocusFoldStrategy)}
-              >
-                {FOCUS_STRATEGIES.map(strategy => (
-                  <option key={strategy} value={strategy} disabled={strategy !== 'keep-recent'}>
-                    {t(`focus.strategy.${strategy}`)}
-                  </option>
-                ))}
-              </select>
-            )}
-          />
-          <Row
-            title={t('focus.reasoning')}
-            hint={t('focus.reasoningHint')}
-            control={(
-              <Checkbox
-                checked={focus.focusReasoning}
-                onChange={next => setField('focusReasoning', next)}
-                label={focus.focusReasoning ? '开' : '关'}
-              />
-            )}
-          />
-        </div>
-      </details>
-
-      <details className={css.group} open>
-        <summary className={css.groupSummary}>{t('focus.appearanceGroup')}</summary>
-        <div className={css.groupBody}>
-          <Row
-            title={t('focus.bubbleStyle')}
-            hint={t('focus.bubbleStyle.default')}
-            control={(
-              <select
-                className={css.select}
-                value={focus.focusBubbleStyle}
-                onChange={event => setField('focusBubbleStyle', event.target.value as FocusBubbleStyle)}
-              >
-                {FOCUS_BUBBLE_STYLES.map(style => (
-                  <option key={style} value={style}>{t(`focus.bubbleStyle.${style}`)}</option>
-                ))}
-              </select>
-            )}
-          />
-          <Row
-            title={t('focus.summary')}
-            hint={t('focus.summaryHint')}
-            control={(
-              <Checkbox
-                checked={focus.focusSummary}
-                onChange={next => setField('focusSummary', next)}
-                label={focus.focusSummary ? '开' : '关'}
-              />
-            )}
-          />
-          <BubbleSideEditor side="assistant" focus={focus} setField={setField} t={t} {...overlayHandlers('assistant')} />
-          <BubbleSideEditor side="user" focus={focus} setField={setField} t={t} {...overlayHandlers('user')} />
-        </div>
-      </details>
-      </div>
-
-      {/* Fixed bottom pane: the live sample stays pinned while the controls
-          above scroll. */}
-      <div className={css.previewPane}>
-        <span className={css.previewLabel}>{t('focus.preview')} · {t('focus.previewExample')}</span>
-        <RuntimeFoldBox
-          {...PREVIEW_RUN}
-          defaultOpen={focus.focusDefaultOpen}
-          summaryVisible={focus.focusSummary}
-          t={t}
-          renderItem={item => item.kind === 'reasoning'
-            ? <div className={css.previewThink}>{item.text}</div>
-            : <PreviewNode key={item.nodeKey} label={item.nodeKey === 'preview-1' ? 'read' : 'glob'} />}
-        />
-        <ChatBubble
-          role="assistant"
-          compact={focus.focusBubbleStyle === 'compact'}
-          time={Date.now()}
-          custom={previewCustom(focus, 'assistant', overlayDrafts.assistant)}
+      <div className={css.layout}>
+        <nav
+          className={css.tabRail}
+          role="tablist"
+          aria-orientation={narrow ? 'horizontal' : 'vertical'}
+          aria-label={t('focus.sectionLabel')}
+          onKeyDown={onRailKey}
         >
-          <div className={css.previewReply}>这是正式回复示例文本。</div>
-        </ChatBubble>
-        <div className={css.previewUserWrap}>
-          <span className={css.previewLabel}>{t('focus.previewUser')}</span>
-          <ChatBubble
-            role="user"
-            compact={focus.focusBubbleStyle === 'compact'}
-            custom={previewCustom(focus, 'user', overlayDrafts.user)}
-          >
-            这是用户消息示例。
-          </ChatBubble>
+          {TABS.map(candidate => (
+            <button
+              key={candidate}
+              type="button"
+              role="tab"
+              aria-selected={candidate === tab}
+              className={css.tabRailButton}
+              data-active={candidate === tab || undefined}
+              onClick={() => setTab(candidate)}
+            >
+              {t(`focus.tab.${candidate}` as FocusKey)}
+            </button>
+          ))}
+        </nav>
+
+        <div className={css.formPane}>
+          {tab === 'basic' && <BasicPanel focus={focus} setField={setField} t={t} />}
+          {tab === 'fold' && <FoldPanel focus={focus} setField={setField} t={t} />}
+          {tab === 'appearance' && (
+            <AppearancePanel
+              side={appearanceSide}
+              onSide={setAppearanceSide}
+              focus={focus}
+              setField={setField}
+              setFields={setFocusFields}
+              skins={skins}
+              onOpenMaker={() => setMakerOpen(true)}
+              t={t}
+              {...overlayHandlers(appearanceSide)}
+            />
+          )}
+          {tab === 'skins' && (
+            <SkinsPanel
+              skins={skins}
+              focus={focus}
+              setField={setField}
+              setFields={setFocusFields}
+              onOpenMaker={() => setMakerOpen(true)}
+              t={t}
+            />
+          )}
+          {tab === 'advanced' && (
+            <AdvancedPanel focus={focus} setFields={setFocusFields} skins={skins} t={t} />
+          )}
         </div>
+
+        {(!narrow || previewOpen) && (
+          <aside className={css.previewAside}>
+            <span className={css.previewLabel}>
+              {t('focus.preview')} · {t('focus.previewExample')}
+            </span>
+            {showFold && (
+              <RuntimeFoldBox
+                {...PREVIEW_RUN}
+                defaultOpen={focus.focusDefaultOpen}
+                summaryVisible={focus.focusSummary}
+                t={t}
+                renderItem={item => item.kind === 'reasoning'
+                  ? <div className={css.previewThink}>{item.text}</div>
+                  : <PreviewNode key={item.nodeKey} label={item.nodeKey === 'preview-1' ? 'read' : 'glob'} />}
+              />
+            )}
+            <ChatBubble
+              role="assistant"
+              compact={focus.focusBubbleStyle === 'compact'}
+              time={Date.now()}
+              custom={assistantCustom}
+            >
+              <div className={css.previewReply}>{PREVIEW_LONG}</div>
+            </ChatBubble>
+            {showUser && (
+              <div className={css.previewUserWrap}>
+                <span className={css.previewLabel}>{t('focus.previewUser')}</span>
+                <ChatBubble
+                  role="user"
+                  compact={focus.focusBubbleStyle === 'compact'}
+                  custom={userCustom}
+                >
+                  {PREVIEW_LONG}
+                </ChatBubble>
+              </div>
+            )}
+          </aside>
+        )}
       </div>
+
+      <SkinMaker
+        open={makerOpen}
+        onClose={() => setMakerOpen(false)}
+        skins={skins}
+        onSaved={onSkinSaved}
+        seed={seedStyle(appearanceSide, focus)}
+        t={t}
+      />
     </div>
   )
 })

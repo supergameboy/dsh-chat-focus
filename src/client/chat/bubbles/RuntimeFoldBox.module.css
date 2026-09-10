@@ -77,6 +77,12 @@
   max-height: 360px;
   overflow-y: auto;
   overflow-x: hidden;
+  /* Paint containment keeps the body's inner scroll content out of the OUTER
+     conversation scroller's scrollable overflow. Without it Chromium folds the
+     nested content into the ancestor's scrollHeight, so scrolling down past the
+     composer lands in a blank band whose height grows with every expanded box
+     (measured: the leak equalled the body's own scroll overflow). */
+  contain: paint;
   border-top: 1px solid var(--dsw-alias-border-l1);
   display: flex;
   flex-direction: column;

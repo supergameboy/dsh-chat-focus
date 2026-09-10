@@ -1,10 +1,14 @@
 /** Host-backed ChatFocus display policy (fold + bubble chrome). */
 
+import type { SettingsPathOpView } from '@deepseek-ai/dsh-api-remotes/client'
 import { createSnapshotStore, type SnapshotStore } from '@deepseek-ai/dsh-client-store'
 import type { SettingsScope } from '@deepseek-ai/dsh-client-ui-settings/client'
 import {
   DEFAULT_CHAT_SETTINGS, type ChatSettings,
 } from '../chat-settings.ts'
+
+/** JSON value one settings path write accepts. */
+type SettingsValue = Extract<SettingsPathOpView, { op: 'set' }>['value']
 
 /** Live ChatFocus preferences consumed by Chat and its Settings rows. */
 export class ChatFocusPolicy {
@@ -29,6 +33,26 @@ export class ChatFocusPolicy {
     if (current[field] === value) return
     this.settings.set({ ...current, [field]: value })
     void this.host.set(field, value)
+  }
+
+  /**
+   * Publish and persist several fields as one atomic mutation. Used by the
+   * bulk actions (copy one bubble side onto the other, reset everything): one
+   * revision fence and one settings write instead of one per field.
+   * @param patch - fields to overwrite.
+   */
+  setFields(patch: Partial<ChatSettings>): void {
+    const current = this.settings.getSnapshot()
+    const changed = (Object.entries(patch) as [keyof ChatSettings, ChatSettings[keyof ChatSettings]][])
+      .filter(([field, value]) => current[field] !== value)
+    if (changed.length === 0) return
+    this.settings.set({ ...current, ...Object.fromEntries(changed) } as ChatSettings)
+    const ops: SettingsPathOpView[] = changed.map(([field, value]) => ({
+      op: 'set',
+      path: [field as string],
+      value: value as SettingsValue,
+    }))
+    void this.host.mutate(ops)
   }
 
   /**

@@ -10,6 +10,11 @@
     "incremental": false,
     "declaration": false,
     "declarationMap": false,
+    // This package ships BOTH halves: the browser bundle and the Host plugin
+    // that serves skin assets from disk. The client base deliberately hides
+    // node globals; the node half needs them, so they are enabled project-wide
+    // (client purity stays enforced by the tsdown resolveId guard).
+    "types": ["node", "client-build-environment"],
     "noEmit": true,
     "paths": {
       // The fork's own package specifier: node-half types and the browser

@@ -24,7 +24,7 @@ function fitSize(naturalWidth: number, naturalHeight: number, maxWidth: number, 
 }
 
 /** Export one crop region as a bounded JPEG data URI. */
-function cropToDataUrl(image: HTMLImageElement, crop: CropRect): string {
+function cropToDataUrl(image: HTMLImageElement, crop: CropRect, format: 'jpeg' | 'png'): string {
   const nw = image.naturalWidth
   const nh = image.naturalHeight
   const sx = crop.x * nw
@@ -38,7 +38,9 @@ function cropToDataUrl(image: HTMLImageElement, crop: CropRect): string {
   const ctx = canvas.getContext('2d')
   if (ctx === null) throw new Error('canvas 2d context unavailable')
   ctx.drawImage(image, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height)
-  return canvas.toDataURL('image/jpeg', 0.85)
+  // PNG keeps the alpha channel bubble artwork relies on; JPEG is smaller and
+  // fine for a background photo.
+  return format === 'png' ? canvas.toDataURL('image/png') : canvas.toDataURL('image/jpeg', 0.85)
 }
 
 /** Full props of the cropper. */
@@ -49,10 +51,12 @@ export interface ImageCropperProps {
   readonly onConfirm: (dataUrl: string) => void
   /** Abandon cropping. */
   readonly onCancel: () => void
+  /** Output encoding; PNG preserves transparency. @default 'jpeg' */
+  readonly format?: 'jpeg' | 'png' | undefined
 }
 
 /** Free-ratio crop overlay with move/resize gestures. */
-export function ImageCropper({ imageUrl, onConfirm, onCancel }: ImageCropperProps) {
+export function ImageCropper({ imageUrl, onConfirm, onCancel, format = 'jpeg' }: ImageCropperProps) {
   const imageRef = useRef<HTMLImageElement>(null)
   const stageRef = useRef<HTMLDivElement>(null)
   const [view, setView] = useState<{ w: number; h: number } | null>(null)
@@ -105,16 +109,22 @@ export function ImageCropper({ imageUrl, onConfirm, onCancel }: ImageCropperProp
     const image = imageRef.current
     if (image === null) return
     try {
-      onConfirm(cropToDataUrl(image, crop))
+      onConfirm(cropToDataUrl(image, crop, format))
     } catch (error) {
       // Canvas export failure (rare): keep the editor open.
       console.error('chat-focus: crop export failed', error)
     }
-  }, [crop, onConfirm])
+  }, [crop, onConfirm, format])
 
   return (
     <div className={css.root}>
       <div ref={stageRef} className={css.stage}>
+        {/* The frame lives INSIDE the fitted image box, so its percentages are
+            image-relative and the exported crop always matches the frame. */}
+        <div
+          className={css.imageBox}
+          style={view === null ? { visibility: 'hidden' } : { width: view.w, height: view.h }}
+        >
         <img ref={imageRef} src={imageUrl} alt="" className={css.image} draggable={false} />
         {view !== null && (
           <div
@@ -148,6 +158,7 @@ export function ImageCropper({ imageUrl, onConfirm, onCancel }: ImageCropperProp
             />
           </div>
         )}
+        </div>
       </div>
       <div className={css.actions}>
         <button type="button" className={css.cancel} onClick={onCancel}>取消</button>

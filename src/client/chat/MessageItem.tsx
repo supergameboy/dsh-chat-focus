@@ -293,7 +293,7 @@ export function PendingSubmissionBubble({ submission, renderMessageImages, chrom
 
 /** User and admitted-steering keyed Chat renderer. */
 export const UserMessageNodeView = memo(function UserMessageNodeView({
-  node, renderMessageImages, chatFocus, t,
+  node, renderMessageImages, chatFocus, skins, t,
 }: ChatNodeViewProps<'user' | 'steering'>) {
   const data = node.data
   // ChatFocus user-side chrome: the same unified bubble as assistant replies.
@@ -302,9 +302,14 @@ export const UserMessageNodeView = memo(function UserMessageNodeView({
     () => chatFocus.getSnapshot(),
     () => chatFocus.getSnapshot(),
   )
+  const skinsState = useSyncExternalStore(
+    skins.state.subscribe,
+    () => skins.state.getSnapshot(),
+    () => skins.state.getSnapshot(),
+  )
   const chrome = useMemo(
-    () => focus.focusBubbles ? userBubbleChrome(focus) : undefined,
-    [focus],
+    () => focus.focusBubbles ? userBubbleChrome(focus, skins) : undefined,
+    [focus, skins, skinsState],
   )
   return (
     <UserStyleBubble

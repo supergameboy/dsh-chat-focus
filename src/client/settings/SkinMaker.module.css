@@ -1,0 +1,477 @@
+/* SkinMaker + SkinsPanel + SliceEditor: the skin creation wizard, the library
+   grid, and the nine-slice editor. One module keeps the three surfaces on the
+   same visual vocabulary (badges, drop zones, progress, cards). */
+
+.makerDialog {
+  width: min(920px, 92vw);
+  max-height: 88vh;
+}
+
+.root {
+  display: flex;
+  gap: 16px;
+  align-items: stretch;
+  min-height: 0;
+}
+
+.main {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1 1 60%;
+  min-width: 0;
+  min-height: 0;
+}
+
+.steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.stepChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 12px;
+  color: var(--dsw-alias-label-secondary);
+  background: var(--dsw-alias-bg-base);
+  cursor: pointer;
+}
+
+.stepChip:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.stepChip[data-active] {
+  border-color: var(--dsw-static-deepseek-500);
+  color: var(--dsw-static-deepseek-500);
+  font-weight: 600;
+}
+
+.stepChip[data-done] {
+  color: var(--dsw-alias-label-primary);
+}
+
+.stepIndex {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  font-size: 11px;
+  background: var(--dsw-alias-bg-layer-3);
+}
+
+.body {
+  flex: 1;
+  min-height: 220px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.stepBody {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.spacer {
+  flex: 1;
+}
+
+/* ── Source step ─────────────────────────────────────────────────────────── */
+
+.dropZone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 28px 16px;
+  border: 1px dashed var(--dsw-alias-border-l2);
+  border-radius: 10px;
+  background: var(--dsw-alias-bg-layer-1);
+  text-align: center;
+  font: var(--dsw-font-xs-13);
+  color: var(--dsw-alias-label-secondary);
+}
+
+.dropZone[data-hover] {
+  border-color: var(--dsw-static-deepseek-500);
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.dropHint {
+  font: var(--dsw-font-xs-13);
+  color: var(--dsw-alias-label-caption);
+}
+
+.detected {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 11px;
+  color: var(--dsw-alias-label-secondary);
+  background: var(--dsw-alias-bg-layer-3);
+}
+
+.frameList {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.frameRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 8px;
+  border: 1px solid var(--dsw-alias-border-l1);
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.frameName {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--dsw-alias-label-primary);
+}
+
+/* ── Prepare step ────────────────────────────────────────────────────────── */
+
+.buildRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.progress {
+  flex: 1;
+  min-width: 120px;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--dsw-alias-bg-layer-3);
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--dsw-static-deepseek-500);
+  transition: width 120ms linear;
+}
+
+.assetPreview {
+  max-width: 100%;
+  max-height: 160px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 8px;
+  background:
+    repeating-conic-gradient(var(--dsw-alias-bg-layer-2) 0% 25%, var(--dsw-alias-bg-base) 0% 50%) 50% / 16px 16px;
+}
+
+.spritePreview {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* ── Geometry step ───────────────────────────────────────────────────────── */
+
+.sliceRoot {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.sliceStage {
+  position: relative;
+  display: inline-block;
+  align-self: flex-start;
+  max-width: 100%;
+  touch-action: none;
+}
+
+.sliceImage {
+  display: block;
+  max-width: 100%;
+  max-height: 260px;
+  border-radius: 6px;
+  background:
+    repeating-conic-gradient(var(--dsw-alias-bg-layer-2) 0% 25%, var(--dsw-alias-bg-base) 0% 50%) 50% / 16px 16px;
+  user-select: none;
+}
+
+.guide {
+  position: absolute;
+  background: var(--dsw-static-deepseek-500);
+  opacity: 0.75;
+}
+
+.guide[data-axis='x'] {
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  cursor: ew-resize;
+  /* Widen the hit area without widening the visual line. */
+  padding-left: 4px;
+  margin-left: -4px;
+  background-clip: content-box;
+}
+
+.guide[data-axis='y'] {
+  left: 0;
+  right: 0;
+  height: 1px;
+  cursor: ns-resize;
+  padding-top: 4px;
+  margin-top: -4px;
+  background-clip: content-box;
+}
+
+.guide[data-active] {
+  opacity: 1;
+}
+
+.sliceInputs,
+.paddingRow {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.sliceField {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font: var(--dsw-font-xs-13);
+  color: var(--dsw-alias-label-secondary);
+}
+
+/* ── Preview column ──────────────────────────────────────────────────────── */
+
+.preview {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 0 0 36%;
+  min-width: 0;
+  padding: 12px;
+  border: 1px dashed var(--dsw-alias-border-l2);
+  border-radius: 10px;
+  background: var(--dsw-alias-bg-layer-2);
+  overflow-y: auto;
+}
+
+.previewTitle {
+  position: sticky;
+  top: 0;
+  font: var(--dsw-font-xs-13);
+  color: var(--dsw-alias-label-tertiary);
+  background: var(--dsw-alias-bg-layer-2);
+  padding-bottom: 2px;
+}
+
+.previewEmpty {
+  font: var(--dsw-font-xs-13);
+  color: var(--dsw-alias-label-caption);
+}
+
+.previewText {
+  font: var(--dsw-font-s-strong-14);
+  color: var(--dsw-alias-label-primary);
+}
+
+/* ── Library grid ────────────────────────────────────────────────────────── */
+
+.library {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.libraryBar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--dsw-alias-border-l1);
+  border-radius: 8px;
+  background: var(--dsw-alias-bg-layer-1);
+}
+
+.thumbWrap {
+  position: relative;
+  height: 76px;
+  border-radius: 6px;
+  overflow: hidden;
+  background:
+    repeating-conic-gradient(var(--dsw-alias-bg-layer-2) 0% 25%, var(--dsw-alias-bg-base) 0% 50%) 50% / 16px 16px;
+}
+
+.thumb {
+  width: 100%;
+  height: 100%;
+  background-repeat: no-repeat;
+  background-position: 50% 50%;
+}
+
+/* Video skins have no cheap poster frame: a play glyph marks the tile. */
+.thumbGlyph {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  font-size: 22px;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.cardTitle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.cardName {
+  font: var(--dsw-font-s-strong-14);
+  color: var(--dsw-alias-label-primary);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cardActions,
+.cardRename {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+/* Shared inputs reused inside the wizard and the library cards. */
+.select,
+.textInput,
+.number {
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font: var(--dsw-font-s-strong-14);
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-alias-bg-base);
+}
+
+.select {
+  min-width: 120px;
+}
+
+.number {
+  width: 68px;
+}
+
+.textInput {
+  min-width: 0;
+  width: 160px;
+}
+
+.uploadButton {
+  border: 1px solid var(--dsw-static-deepseek-500);
+  border-radius: 6px;
+  padding: 4px 12px;
+  font-size: 12px;
+  color: var(--dsw-static-deepseek-500);
+  background: var(--dsw-alias-bg-base);
+  cursor: pointer;
+}
+
+.uploadButton:hover:not(:disabled) {
+  color: #fff;
+  background: var(--dsw-static-deepseek-500);
+}
+
+.uploadButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.clearButton {
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 12px;
+  color: var(--dsw-alias-label-secondary);
+  background: var(--dsw-alias-bg-base);
+  cursor: pointer;
+}
+
+.clearButton:hover:not(:disabled) {
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.clearButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* Hint + auto-estimate row under the slice stage. */
+.sliceActions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+

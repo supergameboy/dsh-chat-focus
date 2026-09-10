@@ -77,6 +77,12 @@ export const FOCUS_BUBBLE_GRADIENT_ANGLE_FIELD = 'focusBubbleGradientAngle'
 export const FOCUS_BUBBLE_BG_POSITION_FIELD = 'focusBubbleBgPosition'
 /** Text-readability overlay on the assistant bubble background (CSS color). */
 export const FOCUS_BUBBLE_OVERLAY_FIELD = 'focusBubbleOverlay'
+/** Backdrop-layer opacity percentage for the assistant bubble (0..100). */
+export const FOCUS_BUBBLE_BACKDROP_OPACITY_FIELD = 'focusBubbleBackdropOpacity'
+/** Frosted-glass backdrop-filter preset for the assistant bubble. */
+export const FOCUS_BUBBLE_BACKDROP_BLUR_FIELD = 'focusBubbleBackdropBlur'
+/** Applied bubble-skin id for the assistant side ('' = none/custom). */
+export const FOCUS_BUBBLE_SKIN_FIELD = 'focusBubbleSkin'
 
 /** Custom user-bubble background (CSS color; empty = theme default deepseek blue). */
 export const FOCUS_USER_BUBBLE_BG_FIELD = 'focusUserBubbleBg'
@@ -110,10 +116,28 @@ export const FOCUS_USER_BUBBLE_BG_POSITION_FIELD = 'focusUserBubbleBgPosition'
 export const FOCUS_USER_BUBBLE_OVERLAY_FIELD = 'focusUserBubbleOverlay'
 /** User-bubble template id ('' = none/custom). */
 export const FOCUS_USER_BUBBLE_PRESET_FIELD = 'focusUserBubblePreset'
+/** Backdrop-layer opacity percentage for the user bubble (0..100). */
+export const FOCUS_USER_BUBBLE_BACKDROP_OPACITY_FIELD = 'focusUserBubbleBackdropOpacity'
+/** Frosted-glass backdrop-filter preset for the user bubble. */
+export const FOCUS_USER_BUBBLE_BACKDROP_BLUR_FIELD = 'focusUserBubbleBackdropBlur'
+/** Applied bubble-skin id for the user side ('' = none/custom). */
+export const FOCUS_USER_BUBBLE_SKIN_FIELD = 'focusUserBubbleSkin'
 
-/** Background-image vertical alignment modes. */
+/** Frosted-glass presets: '' = off, otherwise a backdrop-filter blur radius. */
+export const FOCUS_BACKDROP_BLUR_PRESETS = ['', '4px', '10px', '18px'] as const
+export type FocusBackdropBlur = typeof FOCUS_BACKDROP_BLUR_PRESETS[number]
+
+/** Default backdrop opacity percentage (fully opaque). */
+export const DEFAULT_FOCUS_BACKDROP_OPACITY = 100
+/** Default frosted-glass preset (off). */
+export const DEFAULT_FOCUS_BACKDROP_BLUR: FocusBackdropBlur = ''
+/** Default applied skin (none). */
+export const DEFAULT_FOCUS_BUBBLE_SKIN = ''
+
+/** Legacy alignment names, still readable from older settings documents. */
 export const FOCUS_BG_POSITIONS = ['top', 'center', 'bottom'] as const
-export type FocusBgPosition = typeof FOCUS_BG_POSITIONS[number]
+/** Background focal point as a CSS `background-position` pair ('50% 50%' = centred). */
+export type FocusBgPosition = string
 
 /** Defaults shared by the schema, the client scope, and the grouping engine. */
 export const DEFAULT_FOCUS_ENABLED = true
@@ -138,7 +162,7 @@ export const DEFAULT_FOCUS_BUBBLE_PADDING = ''
 export const DEFAULT_FOCUS_BUBBLE_GRADIENT_FROM = ''
 export const DEFAULT_FOCUS_BUBBLE_GRADIENT_TO = ''
 export const DEFAULT_FOCUS_BUBBLE_GRADIENT_ANGLE = '135'
-export const DEFAULT_FOCUS_BUBBLE_BG_POSITION: FocusBgPosition = 'center'
+export const DEFAULT_FOCUS_BUBBLE_BG_POSITION: FocusBgPosition = '50% 50%'
 export const DEFAULT_FOCUS_BUBBLE_OVERLAY = ''
 export const DEFAULT_FOCUS_USER_BUBBLE_BG = ''
 export const DEFAULT_FOCUS_USER_BUBBLE_BORDER = ''
@@ -153,9 +177,13 @@ export const DEFAULT_FOCUS_USER_BUBBLE_PADDING = ''
 export const DEFAULT_FOCUS_USER_BUBBLE_GRADIENT_FROM = ''
 export const DEFAULT_FOCUS_USER_BUBBLE_GRADIENT_TO = ''
 export const DEFAULT_FOCUS_USER_BUBBLE_GRADIENT_ANGLE = '135'
-export const DEFAULT_FOCUS_USER_BUBBLE_BG_POSITION: FocusBgPosition = 'center'
+export const DEFAULT_FOCUS_USER_BUBBLE_BG_POSITION: FocusBgPosition = '50% 50%'
 export const DEFAULT_FOCUS_USER_BUBBLE_OVERLAY = ''
 export const DEFAULT_FOCUS_USER_BUBBLE_PRESET = ''
+export const DEFAULT_FOCUS_BUBBLE_BACKDROP_OPACITY = DEFAULT_FOCUS_BACKDROP_OPACITY
+export const DEFAULT_FOCUS_USER_BUBBLE_BACKDROP_OPACITY = DEFAULT_FOCUS_BACKDROP_OPACITY
+export const DEFAULT_FOCUS_BUBBLE_BACKDROP_BLUR: FocusBackdropBlur = DEFAULT_FOCUS_BACKDROP_BLUR
+export const DEFAULT_FOCUS_USER_BUBBLE_BACKDROP_BLUR: FocusBackdropBlur = DEFAULT_FOCUS_BACKDROP_BLUR
 
 /** Durable Chat section shared by the Host schema and browser scope. */
 export interface ChatSettings {
@@ -209,6 +237,12 @@ export interface ChatSettings {
   focusBubbleBgPosition: FocusBgPosition
   /** Text-readability overlay on the assistant bubble background. */
   focusBubbleOverlay: string
+  /** Backdrop-layer opacity percentage (0..100). */
+  focusBubbleBackdropOpacity: number
+  /** Frosted-glass backdrop-filter preset. */
+  focusBubbleBackdropBlur: FocusBackdropBlur
+  /** Applied bubble-skin id ('' = none/custom). */
+  focusBubbleSkin: string
   /** Custom user-bubble background (CSS color; empty = theme default). */
   focusUserBubbleBg: string
   /** Custom user-bubble border color (CSS color; empty = none). */
@@ -241,6 +275,12 @@ export interface ChatSettings {
   focusUserBubbleOverlay: string
   /** User-bubble template id ('' = none/custom). */
   focusUserBubblePreset: string
+  /** Backdrop-layer opacity percentage (0..100). */
+  focusUserBubbleBackdropOpacity: number
+  /** Frosted-glass backdrop-filter preset. */
+  focusUserBubbleBackdropBlur: FocusBackdropBlur
+  /** Applied bubble-skin id ('' = none/custom). */
+  focusUserBubbleSkin: string
 }
 
 /** ChatFocus surface used by the grouping engine and the bubble chrome. */
@@ -274,6 +314,9 @@ export const DEFAULT_CHAT_SETTINGS: ChatSettings = {
   focusBubbleGradientAngle: DEFAULT_FOCUS_BUBBLE_GRADIENT_ANGLE,
   focusBubbleBgPosition: DEFAULT_FOCUS_BUBBLE_BG_POSITION,
   focusBubbleOverlay: DEFAULT_FOCUS_BUBBLE_OVERLAY,
+  focusBubbleBackdropOpacity: DEFAULT_FOCUS_BUBBLE_BACKDROP_OPACITY,
+  focusBubbleBackdropBlur: DEFAULT_FOCUS_BUBBLE_BACKDROP_BLUR,
+  focusBubbleSkin: DEFAULT_FOCUS_BUBBLE_SKIN,
   focusUserBubbleBg: DEFAULT_FOCUS_USER_BUBBLE_BG,
   focusUserBubbleBorder: DEFAULT_FOCUS_USER_BUBBLE_BORDER,
   focusUserBubbleRadius: DEFAULT_FOCUS_USER_BUBBLE_RADIUS,
@@ -290,6 +333,9 @@ export const DEFAULT_CHAT_SETTINGS: ChatSettings = {
   focusUserBubbleBgPosition: DEFAULT_FOCUS_USER_BUBBLE_BG_POSITION,
   focusUserBubbleOverlay: DEFAULT_FOCUS_USER_BUBBLE_OVERLAY,
   focusUserBubblePreset: DEFAULT_FOCUS_USER_BUBBLE_PRESET,
+  focusUserBubbleBackdropOpacity: DEFAULT_FOCUS_USER_BUBBLE_BACKDROP_OPACITY,
+  focusUserBubbleBackdropBlur: DEFAULT_FOCUS_USER_BUBBLE_BACKDROP_BLUR,
+  focusUserBubbleSkin: DEFAULT_FOCUS_BUBBLE_SKIN,
 }
 
 /** Durable Chat schema; also the wire envelope the browser scope validates against. */
@@ -317,8 +363,11 @@ export const ChatSettingsSchema: z<ChatSettings> = z.object({
   [FOCUS_BUBBLE_GRADIENT_FROM_FIELD]: z.string().default(DEFAULT_FOCUS_BUBBLE_GRADIENT_FROM),
   [FOCUS_BUBBLE_GRADIENT_TO_FIELD]: z.string().default(DEFAULT_FOCUS_BUBBLE_GRADIENT_TO),
   [FOCUS_BUBBLE_GRADIENT_ANGLE_FIELD]: z.string().default(DEFAULT_FOCUS_BUBBLE_GRADIENT_ANGLE),
-  [FOCUS_BUBBLE_BG_POSITION_FIELD]: z.union([...FOCUS_BG_POSITIONS]).default(DEFAULT_FOCUS_BUBBLE_BG_POSITION),
+  [FOCUS_BUBBLE_BG_POSITION_FIELD]: z.string().default(DEFAULT_FOCUS_BUBBLE_BG_POSITION),
   [FOCUS_BUBBLE_OVERLAY_FIELD]: z.string().default(DEFAULT_FOCUS_BUBBLE_OVERLAY),
+  [FOCUS_BUBBLE_BACKDROP_OPACITY_FIELD]: z.number().default(DEFAULT_FOCUS_BUBBLE_BACKDROP_OPACITY),
+  [FOCUS_BUBBLE_BACKDROP_BLUR_FIELD]: z.union([...FOCUS_BACKDROP_BLUR_PRESETS]).default(DEFAULT_FOCUS_BUBBLE_BACKDROP_BLUR),
+  [FOCUS_BUBBLE_SKIN_FIELD]: z.string().default(DEFAULT_FOCUS_BUBBLE_SKIN),
   [FOCUS_USER_BUBBLE_BG_FIELD]: z.string().default(DEFAULT_FOCUS_USER_BUBBLE_BG),
   [FOCUS_USER_BUBBLE_BORDER_FIELD]: z.string().default(DEFAULT_FOCUS_USER_BUBBLE_BORDER),
   [FOCUS_USER_BUBBLE_RADIUS_FIELD]: z.string().default(DEFAULT_FOCUS_USER_BUBBLE_RADIUS),
@@ -332,7 +381,10 @@ export const ChatSettingsSchema: z<ChatSettings> = z.object({
   [FOCUS_USER_BUBBLE_GRADIENT_FROM_FIELD]: z.string().default(DEFAULT_FOCUS_USER_BUBBLE_GRADIENT_FROM),
   [FOCUS_USER_BUBBLE_GRADIENT_TO_FIELD]: z.string().default(DEFAULT_FOCUS_USER_BUBBLE_GRADIENT_TO),
   [FOCUS_USER_BUBBLE_GRADIENT_ANGLE_FIELD]: z.string().default(DEFAULT_FOCUS_USER_BUBBLE_GRADIENT_ANGLE),
-  [FOCUS_USER_BUBBLE_BG_POSITION_FIELD]: z.union([...FOCUS_BG_POSITIONS]).default(DEFAULT_FOCUS_USER_BUBBLE_BG_POSITION),
+  [FOCUS_USER_BUBBLE_BG_POSITION_FIELD]: z.string().default(DEFAULT_FOCUS_USER_BUBBLE_BG_POSITION),
   [FOCUS_USER_BUBBLE_OVERLAY_FIELD]: z.string().default(DEFAULT_FOCUS_USER_BUBBLE_OVERLAY),
   [FOCUS_USER_BUBBLE_PRESET_FIELD]: z.string().default(DEFAULT_FOCUS_USER_BUBBLE_PRESET),
+  [FOCUS_USER_BUBBLE_BACKDROP_OPACITY_FIELD]: z.number().default(DEFAULT_FOCUS_USER_BUBBLE_BACKDROP_OPACITY),
+  [FOCUS_USER_BUBBLE_BACKDROP_BLUR_FIELD]: z.union([...FOCUS_BACKDROP_BLUR_PRESETS]).default(DEFAULT_FOCUS_USER_BUBBLE_BACKDROP_BLUR),
+  [FOCUS_USER_BUBBLE_SKIN_FIELD]: z.string().default(DEFAULT_FOCUS_BUBBLE_SKIN),
 })

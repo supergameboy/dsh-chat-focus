@@ -1,13 +1,17 @@
 // ChatBubble: the ONE themeable chat-bubble chrome shared by both roles —
 // assistant replies (DeepSeek fish logo + HH:MM header) and user messages
 // (clock-only, right-aligned header). User-defined colors/border/radius/
-// width/background image arrive via CSS variables. Default look mirrors the
-// DeepSeek theme blue on both sides, so the two sides stay consistent.
+// width/background image/opacity/blur and an applied bubble skin arrive via
+// CSS variables and the backdrop layer. Default look mirrors the DeepSeek
+// theme blue on both sides, so the two sides stay consistent.
 
 import { memo } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
 import clsx from 'clsx'
 import { FishLogo } from '@deepseek-ai/dsh-client-ui-primitives'
+import { BubbleBackdrop } from './BubbleBackdrop.tsx'
+import type { SkinRender } from './skin-render.ts'
+import { paddingShorthand } from '../../skins/geometry.ts'
 import css from './ChatBubble.module.css'
 
 /** Clock label for one message timestamp (HH:MM; calendar date when older than today). */
@@ -40,10 +44,16 @@ export interface ChatBubbleCustomStyle {
   /** Background-image fit: cover | contain | stretch (100% 100%). */
   readonly bgSize?: 'cover' | 'contain' | 'stretch'
   /** Background-image vertical alignment for cover/stretch fits. */
-  readonly bgPosition?: 'top' | 'center' | 'bottom'
+  readonly bgPosition?: string
   /** Text-readability overlay: a signed percentage string (-100 = solid
    *  black, 0 = none, +100 = solid white); legacy CSS colors pass through. */
   readonly overlay?: string
+  /** Whole-backdrop opacity percentage ('' or '100' = opaque). */
+  readonly backdropOpacity?: string
+  /** Frosted-glass blur length ('' = off). */
+  readonly backdropBlur?: string
+  /** Applied bubble skin; when present it owns the backdrop and padding. */
+  readonly skin?: SkinRender | undefined
   /** CSS color for the bubble text. */
   readonly textColor?: string
   /** CSS font family for the bubble text. */
@@ -66,11 +76,13 @@ export function bgImageCssValue(value: string): string {
   return value
 }
 
-/** Map a vertical alignment mode to a CSS `background-position` value. */
-export function bgPositionCss(position: 'top' | 'center' | 'bottom' | undefined): string | undefined {
+/** Map a stored focal point (or a legacy alignment name) to CSS. */
+export function bgPositionCss(position: string | undefined): string | undefined {
+  if (position === undefined || position === '') return undefined
   if (position === 'top') return '50% 0%'
   if (position === 'bottom') return '50% 100%'
-  return undefined // center: the CSS fallback 50% 50% applies
+  if (position === 'center') return undefined // the CSS fallback 50% 50% applies
+  return position
 }
 
 /** Map a signed overlay percentage (-100..+100) to a CSS overlay color:
@@ -104,14 +116,15 @@ export interface ChatBubbleProps {
 export const ChatBubble = memo(function ChatBubble({
   role, compact, time, custom, children,
 }: ChatBubbleProps) {
+  const skin = custom?.skin
   const customVars: Record<string, string> = {}
   if (custom !== undefined) {
+    // Colour, gradient, image, readability overlay, opacity, glass, and text
+    // always flow from the user's settings — a skin only owns the artwork
+    // geometry (radius + content inset), and its packaged style seeds these
+    // fields when it is applied.
     if (custom.bg !== undefined && custom.bg !== '') customVars['--cf-bubble-bg'] = custom.bg
     if (custom.border !== undefined && custom.border !== '') customVars['--cf-bubble-border'] = custom.border
-    if (custom.radius !== undefined && custom.radius !== '') {
-      customVars['--cf-bubble-radius'] = custom.radius
-      customVars['--cf-bubble-corner'] = custom.radius
-    }
     if (custom.bgImage !== undefined && custom.bgImage !== '') {
       customVars['--cf-bubble-bg-image'] = bgImageCssValue(custom.bgImage)
     }
@@ -124,6 +137,15 @@ export const ChatBubble = memo(function ChatBubble({
       const overlay = overlayCss(custom.overlay)
       if (overlay !== undefined) customVars['--cf-bubble-overlay'] = overlay
     }
+    if (skin === undefined) {
+      if (custom.radius !== undefined && custom.radius !== '') customVars['--cf-bubble-radius'] = custom.radius
+      if (custom.padding !== undefined && custom.padding !== '') customVars['--cf-bubble-padding'] = custom.padding
+    } else {
+      // The artwork defines the silhouette and the content inset it wants.
+      const radius = skin.radius
+      customVars['--cf-bubble-radius'] = `${String(radius)}px`
+      customVars['--cf-bubble-padding'] = paddingShorthand(skin.padding)
+    }
     if (custom.textColor !== undefined && custom.textColor !== '') {
       customVars['--cf-bubble-text-color'] = custom.textColor
       // The markdown body colors itself with the host label token; overriding
@@ -132,7 +154,6 @@ export const ChatBubble = memo(function ChatBubble({
     }
     if (custom.font !== undefined && custom.font !== '') customVars['--cf-bubble-font'] = custom.font
     if (custom.fontSize !== undefined && custom.fontSize !== '') customVars['--cf-bubble-font-size'] = custom.fontSize
-    if (custom.padding !== undefined && custom.padding !== '') customVars['--cf-bubble-padding'] = custom.padding
   }
   const bubbleStyle: Record<string, string> = {}
   if (custom?.maxWidth !== undefined && custom.maxWidth !== '') {
@@ -153,7 +174,14 @@ export const ChatBubble = memo(function ChatBubble({
           )}
         </div>
       )}
-      <div className={css.content} style={customVars as CSSProperties}>{children}</div>
+      <div className={css.content} style={customVars as CSSProperties}>
+        <BubbleBackdrop
+          {...skin === undefined ? {} : { skin }}
+          {...custom?.backdropOpacity === undefined ? {} : { opacity: custom.backdropOpacity }}
+          {...custom?.backdropBlur === undefined ? {} : { blur: custom.backdropBlur }}
+        />
+        <div className={css.body}>{children}</div>
+      </div>
     </div>
   )
 })

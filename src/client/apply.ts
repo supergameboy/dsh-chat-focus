@@ -21,6 +21,7 @@ import type {
 import type { ChatSnapshot } from './contract/snapshot.ts'
 import { EMPTY_CHAT_SNAPSHOT } from './contract/snapshot.ts'
 import { ApprovalCommand } from './chat/ApprovalCommand.tsx'
+import { BUILTIN_SKINS } from './chat/bubbles/builtin-skins.ts'
 import { ChatView } from './chat/ChatView.tsx'
 import { registerChatNodeRenderers } from './chat/register-node-renderers.ts'
 import { StatsLine } from './chat/StatsLine.tsx'
@@ -29,6 +30,7 @@ import { DetailsPanel } from './details/DetailsPanel.tsx'
 import { en, NS, zh } from './locale.ts'
 import { ChatFocusSection, type ChatFocusSectionInjected } from './settings/ChatFocusSection.tsx'
 import { FOCUS_NS, en as focusEn, zh as focusZh } from './settings/focus-locale.ts'
+import { SkinRegistry } from './skins/registry.ts'
 import { createChatStore } from './stores.ts'
 import { ChatFocusPolicy } from './chat-focus-policy.ts'
 import { CHAT_SETTINGS_NAMESPACE, type ChatSettings } from '../chat-settings.ts'
@@ -81,6 +83,10 @@ export function apply(ctx: Context): void {
   const chatFocus = new ChatFocusPolicy(
     ctx.settingsScope.bind<ChatSettings>({ namespace: CHAT_SETTINGS_NAMESPACE }),
   )
+  // Bubble-skin library: built-ins are immediate; the durable half loads over
+  // the Host asset store and degrades to built-ins when that is unavailable.
+  const skins = new SkinRegistry(BUILTIN_SKINS)
+  void skins.load()
 
   // ChatFocus display page (fork): fold strategies, bubble skins, live preview.
   ctx.slots.inject('settings.section', () => ctx.slots.register({
@@ -92,6 +98,8 @@ export function apply(ctx: Context): void {
     inject: (): ChatFocusSectionInjected => ({
       hooks: { focusSettings: chatFocus.settings },
       setFocusField: (field, value) => { chatFocus.setField(field, value) },
+      setFocusFields: patch => { chatFocus.setFields(patch) },
+      skins,
     }),
   }, ChatFocusSection))
 
@@ -114,6 +122,7 @@ export function apply(ctx: Context): void {
         const chat = chatSource(binding)
         return {
           chatFocus: chatFocus.settings,
+          skins,
           keyedHooks: {
             chatNode: key => chat.getSnapshot().nodes.source(key),
             chatNodeProcess: key => chat.getSnapshot().nodes.processSource(key),

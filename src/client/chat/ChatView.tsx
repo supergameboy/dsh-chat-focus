@@ -268,7 +268,7 @@ const ChatNodeList = memo(function ChatNodeList({ order, nodes, focus, ...seatPr
 export function ChatView({
   useSession, useChat, useChatNode, useChatNodeProcess, useSessions, useStore, actions, renderSlot,
   sessionId, openFile, loadOlder, loadThrough, loadImage, openView, chatScroll, forkAt, fileMentions,
-  useProjection, chatFocus, t,
+  useProjection, chatFocus, skins, t,
 }: ChatViewSlotProps) {
   const order = useChat(s => s.order)
   const nodeStore = useChat(s => s.nodes)
@@ -359,9 +359,14 @@ export function ChatView({
   )
   const runningTurnStart = useMemo(() => runningTurnStartTime(timeline), [timeline])
   // User-side pending rows share the same ChatFocus bubble chrome as durable rows.
+  const skinsState = useSyncExternalStore(
+    skins.state.subscribe,
+    () => skins.state.getSnapshot(),
+    () => skins.state.getSnapshot(),
+  )
   const pendingChrome = useMemo(
-    () => focus.focusBubbles ? userBubbleChrome(focus) : undefined,
-    [focus],
+    () => focus.focusBubbles ? userBubbleChrome(focus, skins) : undefined,
+    [focus, skins, skinsState],
   )
 
   const listRef = useRef<HTMLDivElement | null>(null)
@@ -841,6 +846,7 @@ export function ChatView({
             nodes={nodeStore}
             focus={focus}
             chatFocus={chatFocus}
+            skins={skins}
             useChatNode={useChatNode}
             useChatNodeProcess={useChatNodeProcess}
             historyIncomplete={hasMore}

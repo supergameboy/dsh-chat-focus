@@ -6,7 +6,7 @@ import { assistantBubbleCustom } from './bubbles/chrome.ts'
 
 /** Streaming, settled, and interrupted Assistant states share one keyed renderer instance. */
 export const AssistantNodeView = memo(function AssistantNodeView({
-  node, useTurnData, openFile, renderMessageImages, fileMentions, chatFocus, t,
+  node, useTurnData, openFile, renderMessageImages, fileMentions, chatFocus, skins, t,
 }: ChatNodeViewProps<'assistant-step'>) {
   const data = node.data
   // Only a reply (a step carrying prose) wears the bubble: text-less steps are
@@ -17,6 +17,17 @@ export const AssistantNodeView = memo(function AssistantNodeView({
     chatFocus.subscribe,
     () => chatFocus.getSnapshot(),
     () => chatFocus.getSnapshot(),
+  )
+  // The applied skin resolves through the library snapshot, so a skin that
+  // arrives after first paint (or gets edited) re-renders these bubbles.
+  const skinsState = useSyncExternalStore(
+    skins.state.subscribe,
+    () => skins.state.getSnapshot(),
+    () => skins.state.getSnapshot(),
+  )
+  const custom = useMemo(
+    () => assistantBubbleCustom(focus, skins),
+    [focus, skins, skinsState],
   )
   const turn = node.location.kind === 'turn' || node.location.kind === 'step'
     ? node.location.turn
@@ -53,7 +64,7 @@ export const AssistantNodeView = memo(function AssistantNodeView({
       role="assistant"
       compact={focus.focusBubbleStyle === 'compact'}
       time={data.time}
-      custom={assistantBubbleCustom(focus)}
+      custom={custom}
     >
       {markdown}
     </ChatBubble>

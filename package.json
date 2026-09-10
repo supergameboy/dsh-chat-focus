@@ -1,7 +1,7 @@
 {
   "name": "dsh-chat-focus",
   "description": "dsh web 对话界面插件：折叠运行时信息 + 聊天气泡 + 可配置设置（聊天层插件，骑在宿主 @deepseek-ai/dsh-client-ui-conversation 引擎上，替换宿主 ui-chat 气泡行）",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "type": "module",
   "repository": {
     "type": "git",
@@ -52,6 +52,9 @@
     "build": "pnpm run clean && pnpm run typecheck && pnpm run decl && pnpm run bundle",
     "prepublishOnly": "node -e \"require('node:fs').rmSync('lib',{recursive:true,force:true})\" && node node_modules/typescript/lib/tsc.js --noEmit && node node_modules/typescript/lib/tsc.js -p tsconfig.decl.json && node node_modules/tsdown/dist/run.mjs",
     "test:engine": "node --import tsx/esm tests/engine.check.ts",
+    "test:skin": "node --import tsx/esm tests/skin.check.ts",
+    "test:store": "node --import tsx/esm tests/skin-store.check.ts",
+    "test": "npm run test:engine && npm run test:skin && npm run test:store",
     "setup:links": "node scripts/setup-junctions.mjs",
     "clean": "node -e \"require('node:fs').rmSync('lib',{recursive:true,force:true})\""
   },
